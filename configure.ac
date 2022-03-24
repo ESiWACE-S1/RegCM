@@ -119,6 +119,17 @@ if eval "test x"$USE_NHL" = x1"; then
   AC_SUBST(AM_CPPFLAGS)
 fi
 
+USE_OPENACC="0"
+AC_ARG_ENABLE(openacc,
+  AC_HELP_STRING([--enable-openacc],
+                 [Compile OpenACC directives (only for PGI fortran compilation)]),
+                 [USE_OPENACC="1"]
+)
+if eval "test x"$USE_OPENACC" = x1"; then
+  AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
+  AC_SUBST(AM_CPPFLAGS)
+fi
+
 USE_PROF="0"
 AC_ARG_ENABLE(profile,
   AC_HELP_STRING([--enable-profile],
@@ -555,6 +566,9 @@ if eval "test x$DEBUG = x1"; then
     FCFLAGS="-Mbounds -Mcache_align -Mchkfpstk -Mchkstk -Mdalign -Mdclchk \
              -Mdepchk -Miomutex -Mrecursive -Msave -Ktrap=divz -O0 -g \
              -gopt -traceback $FCFLAGS"
+    if test "test x$USE_OPENACC = x1"; then
+      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH -Minfo=accel"
+    fi
     AC_SUBST(FCFLAGS)
   fi
   if test -z "$COMPILER_CRAY_TRUE"; then
@@ -618,7 +632,11 @@ else
   fi
   if test -z "$COMPILER_PGI_TRUE"; then
     NOOPTFC="-O1 $FCFLAGS"
-    FCFLAGS="-fastsse $FCFLAGS"
+    FCFLAGS="-O3 -fastsse $FCFLAGS"
+    if test "test x$USE_OPENACC = x1"; then
+      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc -ta=tesla:$PGI_GPU_ARCH -Minfo=accel"
+    fi
     AC_SUBST(FCFLAGS)
     AC_SUBST(NOOPTFC)
   fi
