@@ -141,6 +141,7 @@ module mod_moloch
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
       call getmem3d(qen0,jci1,jci2,ici1,ici2,1,kz,'moloch:qen0')
+!$acc create(ten0,qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
@@ -158,6 +159,7 @@ module mod_moloch
       if ( ipptls /= 1 ) then
         call getmem3d(qwltot,jci1,jci2,ici1,ici2,1,kz,'moloch:qwltot')
         call getmem3d(qwitot,jci1,jci2,ici1,ici2,1,kz,'moloch:qwitot')
+!$acc create(qwltot,qwitot)
       end if
     end if
     if ( do_filterpai ) then
@@ -198,14 +200,17 @@ module mod_moloch
     call assignpnt(mo_atm%qx,qv,iqv)
     if ( ipptls > 0 ) then
       call assignpnt(mo_atm%qx,qc,iqc)
+!$acc create(qc)
       if ( ipptls > 1 ) then
         call assignpnt(mo_atm%qx,qi,iqi)
         call assignpnt(mo_atm%qx,qr,iqr)
         call assignpnt(mo_atm%qx,qs,iqs)
+!$acc create(qr,qi,qs)
       else
         if ( do_fulleq ) then
           call assignpnt(mo_atm%qx,qwltot,iqc)
           call assignpnt(mo_atm%qx,qwitot,iqc)
+!$acc create(qwltot,qwitot)
         end if
       end if
     end if
@@ -230,6 +235,8 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
+
+!$acc create(p,t,pai,qsat,qv,tvirt,tetav)
   end subroutine init_moloch
   !
   ! Moloch dynamical integration engine
@@ -255,6 +262,10 @@ module mod_moloch
 
     call reset_tendencies
 
+!TODO: Update qv, qc, qr, qi, qs, ten0, qen0
+!$acc update device(t,pai)
+
+!$acc parallel loop collapse(3) present(p,pai,qsat,t)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -265,7 +276,10 @@ module mod_moloch
     end do
 
     if ( ipptls > 0 ) then
+!$acc update device(qc)
       if ( ipptls > 1 ) then
+!$acc update device(qv,qi,qr,qs)
+!$acc parallel loop collapse(3) present(tvirt,t,qv,qc,qi,qr,qs)
         do k = 1 , kz
           do i = ice1 , ice2
             do j = jce1 , jce2
@@ -276,6 +290,7 @@ module mod_moloch
           end do
         end do
         if ( do_fulleq ) then
+!$acc parallel loop collapse(3) present(qwltot,qwitot,qc,qi,qr,qs)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -286,6 +301,8 @@ module mod_moloch
           end do
         end if
       else
+!$acc update device(qv)
+!$acc parallel loop collapse(3) present(tvirt,t,qv,qc)
         do k = 1 , kz
           do i = ice1 , ice2
             do j = jce1 , jce2
@@ -295,6 +312,7 @@ module mod_moloch
         end do
       end if
     else
+!$acc parallel loop collapse(3) present(tvirt,t,qv)
       do k = 1 , kz
         do i = ice1 , ice2
           do j = jce1 , jce2
@@ -303,11 +321,13 @@ module mod_moloch
         end do
       end do
       if ( do_fulleq ) then
+!$acc kernels present(qwltot, qwitot)
         qwltot(:,:,:) = d_zero
         qwitot(:,:,:) = d_zero
+!$acc end kernels
       end if
     end if
-
+!$acc parallel loop collapse(3) present(tetav,tvirt,pai)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -316,9 +336,14 @@ module mod_moloch
       end do
     end do
 
+!$acc update host(p,qsat,tvirt,tetav,qwltot,qwitot)
+!TODO: Validate here
+
     if ( idiag > 0 ) then
+!$acc kernels present(ten0,qen0,t,qv)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
+!$acc end kernels
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
@@ -327,13 +352,21 @@ module mod_moloch
     end if
 
     if ( do_filterpai ) then
+!$acc kernels present(pf,pai)
       pf = pai(jce1:jce2,ice1:ice2,:)
+!$acc end kernels
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
+!$acc kernels present(tf,tetav)
         tf = tetav(jce1:jce2,ice1:ice2,:)
+!$acc end kernels
       end if
     end if
+
+!$acc update host(pf) if(do_filterpai)
+!$acc update host(tf) if(do_fulleq .and. do_filtertheta)
+!TODO: Validate here
 
     do jadv = 1 , nadv
 

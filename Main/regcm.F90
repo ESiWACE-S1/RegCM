@@ -58,6 +58,7 @@ program regcm
     write(stderr,*) 'Cannot initilize MPI'
     stop
   end if
+  !$acc data
   call RCM_initialize()
 !
 !**********************************************************************
@@ -79,6 +80,7 @@ program regcm
 !**********************************************************************
 !
   call RCM_finalize()
+  !$acc end data
   call mpi_finalize(ierr)
 !
 end program regcm

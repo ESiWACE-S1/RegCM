@@ -4,6 +4,7 @@
   !             vapor pressure.  Journal of Applied Meteorology, 31, 1507-1513.
   !
 !DIR$ ATTRIBUTES FORCEINLINE :: pfesat
+!$acc routine seq
   pure elemental real(rkx) function pfesat(t) result(es)
     implicit none
     real(rkx) , intent(in) :: t     ! Temperature (K)
