@@ -120,6 +120,8 @@ if eval "test x"$USE_NHL" = x1"; then
 fi
 
 USE_OPENACC="0"
+# TODO: make this configurable
+PGI_GPU_ARCH="cc80"
 AC_ARG_ENABLE(openacc,
   AC_HELP_STRING([--enable-openacc],
                  [Compile OpenACC directives (only for PGI fortran compilation)]),

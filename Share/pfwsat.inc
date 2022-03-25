@@ -1,5 +1,4 @@
 !DIR$ ATTRIBUTES FORCEINLINE :: pfwsat
-!$acc routine seq
   pure elemental real(rkx) function pfwsat(t,p,e) result(ws) ! In kg/kg
     implicit none
     real(rkx) , intent(in) :: t             ! Temperature (K)

@@ -112,7 +112,9 @@ module mod_moloch
 
   contains
 
+!$acc routine seq
 #include <pfesat.inc>
+!$acc routine seq
 #include <pfwsat.inc>
 
   subroutine allocate_moloch
@@ -141,7 +143,7 @@ module mod_moloch
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
       call getmem3d(qen0,jci1,jci2,ici1,ici2,1,kz,'moloch:qen0')
-!$acc create(ten0,qen0)
+!$acc enter data create(ten0,qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
@@ -159,7 +161,7 @@ module mod_moloch
       if ( ipptls /= 1 ) then
         call getmem3d(qwltot,jci1,jci2,ici1,ici2,1,kz,'moloch:qwltot')
         call getmem3d(qwitot,jci1,jci2,ici1,ici2,1,kz,'moloch:qwitot')
-!$acc create(qwltot,qwitot)
+!$acc enter data create(qwltot,qwitot)
       end if
     end if
     if ( do_filterpai ) then
@@ -200,17 +202,17 @@ module mod_moloch
     call assignpnt(mo_atm%qx,qv,iqv)
     if ( ipptls > 0 ) then
       call assignpnt(mo_atm%qx,qc,iqc)
-!$acc create(qc)
+!$acc enter data create(qc)
       if ( ipptls > 1 ) then
         call assignpnt(mo_atm%qx,qi,iqi)
         call assignpnt(mo_atm%qx,qr,iqr)
         call assignpnt(mo_atm%qx,qs,iqs)
-!$acc create(qr,qi,qs)
+!$acc enter data create(qr,qi,qs)
       else
         if ( do_fulleq ) then
           call assignpnt(mo_atm%qx,qwltot,iqc)
           call assignpnt(mo_atm%qx,qwitot,iqc)
-!$acc create(qwltot,qwitot)
+!$acc enter data create(qwltot,qwitot)
         end if
       end if
     end if
@@ -236,7 +238,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 
-!$acc create(p,t,pai,qsat,qv,tvirt,tetav)
+!$acc enter data create(p,t,pai,qsat,qv,tvirt,tetav)
   end subroutine init_moloch
   !
   ! Moloch dynamical integration engine
