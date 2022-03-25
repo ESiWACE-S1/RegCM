@@ -112,9 +112,7 @@ module mod_moloch
 
   contains
 
-!$acc routine seq
 #include <pfesat.inc>
-!$acc routine seq
 #include <pfwsat.inc>
 
   subroutine allocate_moloch
