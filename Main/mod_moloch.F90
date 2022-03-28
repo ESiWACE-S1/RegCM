@@ -1451,8 +1451,8 @@ module mod_moloch
             !  end do
             !end do
           end do
-        end if
 !$acc end parallel
+        end if
 
       end subroutine wafone
 
