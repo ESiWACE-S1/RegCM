@@ -1070,14 +1070,18 @@ module mod_moloch
         end if
 
         ! Vertical advection
-
+!$acc parallel
         do j = jci1 , jci2
           wfw(j,1) = d_zero
           wfw(j,kzp1) = d_zero
         end do
+!$acc end parallel
 
+!$acc parallel loop gang
         do i = ici1 , ici2
+!$acc loop seq
           do k = 1 , kzm1
+!$acc loop vector
             do j = jci1 , jci2
               zamu = s(j,i,k+1) * zdtrdz
               if ( zamu >= d_zero ) then
@@ -1100,12 +1104,15 @@ module mod_moloch
               !                              (d_one-zphi)*pp(j,i,k))
             end do
           end do
+!$acc loop vector
           do j = jci1 , jci2
             zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
             zdv = -s(j,i,2) * zrfmd * pp(j,i,1)
             wz(j,i,1) = pp(j,i,1) + wfw(j,2) * zrfmd + zdv
           end do
+!$acc loop seq
           do k = 2 , kz
+!$acc loop vector
             do j = jci1 , jci2
               zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
               zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
@@ -1120,10 +1127,14 @@ module mod_moloch
           !  end do
           !end do
         end do
+!$acc end parallel
 
         if ( do_vadvtwice ) then
+!$acc parallel loop gang
           do i = ici1 , ici2
+!$acc loop seq
             do k = 1 , kzm1
+!$acc loop vector
               do j = jci1 , jci2
                 zamu = s(j,i,k+1) * zdtrdz
                 if ( zamu >= d_zero ) then
@@ -1146,12 +1157,15 @@ module mod_moloch
                 !                              (d_one-zphi)*wz(j,i,k))
               end do
             end do
+!$acc loop vector
             do j = jci1 , jci2
               zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
               zdv = -s(j,i,2) * zrfmd * wz(j,i,1)
               wz(j,i,1) = wz(j,i,1) + wfw(j,2) * zrfmd + zdv
             end do
+!$acc loop seq
             do k = 2 , kz
+!$acc loop vector
               do j = jci1 , jci2
                 zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
                 zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
@@ -1166,21 +1180,26 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
         end if
 
         if ( ma%has_bdybottom ) then
+!$acc parallel
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice1,k) = wz(j,ici1,k)
             end do
           end do
+!$acc end parallel
         end if
         if ( ma%has_bdytop ) then
+!$acc parallel
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice2,k) = wz(j,ici2,k)
             end do
           end do
+!$acc end parallel
         end if
 
         call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
@@ -1189,8 +1208,11 @@ module mod_moloch
 
           ! Meridional advection
 
+!$acc parallel loop gang
           do k = 1 , kz
+!$acc loop seq
             do i = ici1 , ice2ga
+!$acc loop vector
               do j = jci1 , jci2
                 zamu = v(j,i,k) * zdtrdy
                 if ( zamu > d_zero ) then
@@ -1211,7 +1233,9 @@ module mod_moloch
                 !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
               end do
             end do
+!$acc loop seq
             do i = ici1 , ici2
+!$acc loop vector
               do j = jci1 , jci2
                 zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
                 zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
@@ -1231,29 +1255,37 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
 
           if ( ma%has_bdyleft ) then
+!$acc parallel
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce1,i,k) = p0(jci1,i,k)
               end do
             end do
+!$acc end parallel
           end if
 
           if ( ma%has_bdyright ) then
+!$acc parallel
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce2,i,k) = p0(jci2,i,k)
               end do
             end do
+!$acc end parallel
           end if
 
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
 
           ! Zonal advection
 
+!$acc parallel loop gang
           do k = 1 , kz
+!$acc loop vector
             do i = ici1 , ici2
+!$acc loop seq
               do j = jci1 , jce2ga
                 zamu = u(j,i,k) * mu(j,i) * zdtrdx
                 if ( zamu > d_zero ) then
@@ -1274,7 +1306,9 @@ module mod_moloch
                 !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
               end do
             end do
+!$acc loop vector
             do i = ici1 , ici2
+!$acc loop seq
               do j = jci1 , jci2
                 zcostx = zdtrdx * mu(j,i)
                 zrfme = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
@@ -1293,13 +1327,17 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
 
         else
 
           ! Meridional advection
 
+!$acc parallel loop gang
           do k = 1 , kz
+!$acc loop seq
             do i = ici1 , ice2ga
+!$acc loop vector
               do j = jci1 , jci2
                 zamu = v(j,i,k) * rmv(j,i) * zdtrdy
                 if ( zamu > d_zero ) then
@@ -1320,7 +1358,9 @@ module mod_moloch
               end do
             end do
 
+!$acc loop seq
             do i = ici1 , ici2
+!$acc loop vector
               do j = jci1 , jci2
                 zrfmn = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
                 zrfms = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
@@ -1339,29 +1379,37 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
 
           if ( ma%has_bdyleft ) then
+!$acc parallel
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce1,i,k) = p0(jci1,i,k)
               end do
             end do
+!$acc end parallel
           end if
 
           if ( ma%has_bdyright ) then
+!$acc parallel
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce2,i,k) = p0(jci2,i,k)
               end do
             end do
+!$acc end parallel
           end if
 
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
 
           ! Zonal advection
 
+!$acc parallel loop gang
           do k = 1 , kz
+!$acc loop vector
             do i = ici1 , ici2
+!$acc loop seq
               do j = jci1 , jce2ga
                 zamu = u(j,i,k) * rmu(j,i) * zdtrdx
                 if ( zamu > d_zero ) then
@@ -1382,7 +1430,9 @@ module mod_moloch
               end do
             end do
 
+!$acc loop vector
             do i = ici1 , ici2
+!$acc loop seq
               do j = jci1 , jci2
                 zrfme = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
                 zrfmw = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
@@ -1402,6 +1452,7 @@ module mod_moloch
             !end do
           end do
         end if
+!$acc end parallel
 
       end subroutine wafone
 
