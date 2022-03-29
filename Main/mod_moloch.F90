@@ -2003,6 +2003,7 @@ module mod_moloch
 
     ddamp1 = ddamp*0.125_rkx*dx**2/dts
     if ( lrotllr ) then
+!$acc parallel loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jdi1 , jdi2
@@ -2011,6 +2012,8 @@ module mod_moloch
           end do
         end do
       end do
+!$acc end parallel
+!$acc parallel loop collapse(3)
       do k = 1 , kz
         do i = idi1 , idi2
           do j = jci1 , jci2
@@ -2019,7 +2022,9 @@ module mod_moloch
           end do
         end do
       end do
+!$acc end parallel
     else
+!$acc parallel loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jdi1 , jdi2
@@ -2028,6 +2033,8 @@ module mod_moloch
           end do
         end do
       end do
+!$acc end parallel
+!$acc parallel loop collapse(3)
       do k = 1 , kz
         do i = idi1 , idi2
           do j = jci1 , jci2
@@ -2036,6 +2043,7 @@ module mod_moloch
           end do
         end do
       end do
+!$acc end parallel
     end if
   end subroutine divdamp
 
