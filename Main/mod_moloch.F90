@@ -770,8 +770,8 @@ module mod_moloch
           ! Part of divergence (except w contribution) put in zdiv2
           ! Equation 16
 
-!$acc parallel collapse(3)
           if ( lrotllr ) then
+!$acc parallel collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
