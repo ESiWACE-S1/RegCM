@@ -734,7 +734,7 @@ module mod_moloch
           ud(:,:,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
           vd(:,:,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
 
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               zuh = u(j,i,kz) * hx(j,i) + u(j+1,i,kz) * hx(j+1,i)
@@ -743,7 +743,7 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               s(j,i,kzp1) = -w(j,i,kzp1)
@@ -753,7 +753,7 @@ module mod_moloch
 
           ! Equation 10, generalized vertical velocity
 
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
           do k = kz , 2 , -1
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -771,7 +771,7 @@ module mod_moloch
           ! Equation 16
 
           if ( lrotllr ) then
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -789,7 +789,7 @@ module mod_moloch
             end do
 !$acc end parallel
           else
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -810,7 +810,7 @@ module mod_moloch
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
           call divdamp(dtsound)
           if ( do_filterdiv ) call filt3d
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -824,7 +824,7 @@ module mod_moloch
           ! new w (implicit scheme) from Equation 19
 
           do k = kz , 2 , -1
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 deltaw(j,i,k) = -w(j,i,k)
@@ -865,7 +865,7 @@ module mod_moloch
 
           ! 2nd loop for the tridiagonal inversion
           do k = 2 , kz
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
@@ -876,7 +876,7 @@ module mod_moloch
           end do
 
           ! new Exner function (Equation 19)
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -889,7 +889,7 @@ module mod_moloch
 
           if ( do_fulleq ) then
             if ( ipptls > 0 ) then
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
               do k = 1 , kz
                 do i = ici1 , ici2
                   do j = jci1 , jci2
@@ -913,7 +913,7 @@ module mod_moloch
 
           ! horizontal momentum equations
 
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -928,7 +928,7 @@ module mod_moloch
 
           if ( lrotllr ) then
 
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jdi1 , jdi2
@@ -948,7 +948,7 @@ module mod_moloch
             end do
 !$acc end parallel
             zcy = zdtrdy
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
                 do j = jci1 , jci2
@@ -969,7 +969,7 @@ module mod_moloch
 
           else
 
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jdi1 , jdi2
@@ -988,7 +988,7 @@ module mod_moloch
               end do
             end do
 !$acc end parallel
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
                 do j = jci1 , jci2
@@ -1014,7 +1014,7 @@ module mod_moloch
         ! complete computation of generalized vertical velocity
         ! Complete Equation 10
 
-!$acc parallel collapse(3)
+!$acc parallel loop collapse(3)
         do k = 2 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -1023,14 +1023,14 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
         do i = ici1 , ici2
           do j = jci1 , jci2
             s(j,i,1) = d_zero
           end do
         end do
 !$acc end parallel
-!$acc parallel collapse(2)
+!$acc parallel loop collapse(2)
         do i = ici1 , ici2
           do j = jci1 , jci2
             s(j,i,kzp1) = d_zero
