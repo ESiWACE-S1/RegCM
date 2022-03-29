@@ -1855,6 +1855,7 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: v
     integer(ik4) :: i , j , k
 
+!$acc parallel loop collapse(3)
     do k = 1 , kz
       do i = idii1 , idii2
         do j = jci1 , jci2
@@ -1863,19 +1864,24 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdytop ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdybottom ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
         end do
       end do
+!$acc end parallel
     end if
   end subroutine xtovstag
 
