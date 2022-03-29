@@ -651,7 +651,9 @@ module mod_moloch
 
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
 
+!$acc parallel loop gang
         do k = 1 , kz
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (pai(j-1,i,k) + pai(j+1,i,k) + &
@@ -659,12 +661,14 @@ module mod_moloch
                          d_half   * pai(j,i,k)
             end do
           end do
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               pai(j,i,k) = pai(j,i,k) + nupait * p2d(j,i)
             end do
           end do
         end do
+!$acc end parallel
       end subroutine filtpai
 
       subroutine filttheta
