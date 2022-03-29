@@ -1778,10 +1778,12 @@ module mod_moloch
     real(rkx) , intent(in) , dimension(:,:,:) , pointer :: w
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
     integer(ik4) :: i , j , k , i1 , i2 , j1 , j2
+
     i1 = lbound(wx,2)
     i2 = ubound(wx,2)
     j1 = lbound(wx,1)
     j2 = ubound(wx,1)
+!$acc parallel loop collapse(3)
     do k = 2 , kzm1
       do i = i1 , i2
         do j = j1 , j2
@@ -1790,12 +1792,15 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
+!$acc parallel loop collapse(2)
     do i = i1 , i2
       do j = j1 , j2
         wx(j,i,1)  = d_half * (w(j,i,2)+w(j,i,1))
         wx(j,i,kz) = d_half * (w(j,i,kzp1)+w(j,i,kz))
       end do
     end do
+!$acc end parallel
   end subroutine wstagtox
 
   subroutine xtowstag(wx,w)
