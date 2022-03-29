@@ -1890,6 +1890,7 @@ module mod_moloch
 
     ! Back to wind points: U (fourth order)
 
+!$acc parallel loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jdii1 , jdii2
@@ -1898,22 +1899,28 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdyright ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdyleft ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
         end do
       end do
+!$acc end parallel
     end if
 
     ! Back to wind points: V (fourth order)
+!$acc parallel loop collapse(3)
     do k = 1 , kz
       do i = idii1 , idii2
         do j = jci1 , jci2
@@ -1922,19 +1929,24 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdytop ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdybottom ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
         end do
       end do
+!$acc end parallel
     end if
   end subroutine xtouvstag
 
@@ -1948,6 +1960,7 @@ module mod_moloch
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
 
     ! Compute U-wind on T points
+!$acc parallel loop collapse(3)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jci1 , jci2
@@ -1956,21 +1969,27 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdyleft ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce1,i,k) = d_half * (u(jde1,i,k)+u(jdi1,i,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdyright ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce2,i,k) = d_half*(u(jde2,i,k) + u(jdi2,i,k))
         end do
       end do
+!$acc end parallel
     end if
     ! Compute V-wind on T points
+!$acc parallel loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jce1 , jce2
@@ -1979,19 +1998,24 @@ module mod_moloch
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdybottom ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice1,k) = d_half * (v(j,ide1,k)+v(j,idi1,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdytop ) then
+!$acc parallel loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice2,k) = d_half*(v(j,ide2,k) + v(j,idi2,k))
         end do
       end do
+!$acc end parallel
     end if
   end subroutine uvstagtox
 
