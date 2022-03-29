@@ -625,7 +625,9 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
+!$acc parallel loop gang
         do k = 1 , kz
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (zdiv2(j-1,i,k) + zdiv2(j+1,i,k) + &
@@ -633,12 +635,14 @@ module mod_moloch
                          d_half   * zdiv2(j,i,k)
             end do
           end do
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               zdiv2(j,i,k) = zdiv2(j,i,k) + mo_anu2 * p2d(j,i)
             end do
           end do
         end do
+!$acc end parallel
       end subroutine filt3d
 
       subroutine filtpai
