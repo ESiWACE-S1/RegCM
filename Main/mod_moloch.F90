@@ -140,6 +140,7 @@ module mod_moloch
     call getmem2d(zpbw,jci1,jce2ga,ici1,ici2,'moloch:zpbw')
 !$acc enter data create(zpbw)
     call getmem2d(mx2,jde1,jde2,ide1,ide2,'moloch:mx2')
+!$acc enter data create(mx2)
     call getmem2d(rmu,jde1ga,jde2ga,ide1,ide2,'moloch:rmu')
 !$acc enter data create(rmu)
     call getmem2d(rmv,jde1,jde2,ide1ga,ide2ga,'moloch:rmv')
@@ -366,8 +367,10 @@ module mod_moloch
       end do
     end do
 
+#ifdef DEBUG
 !$acc update host(p,qsat,tvirt,tetav,qwltot,qwitot)
 !TODO: Validate here
+#endif
 
     if ( idiag > 0 ) then
 !$acc kernels present(ten0,qen0,t,qv)
@@ -394,9 +397,11 @@ module mod_moloch
       end if
     end if
 
+#ifdef DEBUG
 !$acc update host(pf) if(do_filterpai)
 !$acc update host(tf) if(do_fulleq .and. do_filtertheta)
 !TODO: Validate here
+#endif
 
     do jadv = 1 , nadv
 
@@ -1432,7 +1437,8 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc parallel loop gang
+!$acc parallel present(rmv, pp, v, zpby, wz, mx2, p0)
+!$acc loop gang
           do k = 1 , kz
 !$acc loop seq
             do i = ici1 , ice2ga
@@ -1456,7 +1462,6 @@ module mod_moloch
                 !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
               end do
             end do
-
 !$acc loop seq
             do i = ici1 , ici2
 !$acc loop vector
