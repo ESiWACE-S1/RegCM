@@ -120,10 +120,12 @@ module mod_moloch
     call getmem1d(gzitak,1,kzp1,'moloch:gzitak')
     call getmem1d(gzitakh,1,kz,'moloch:gzitakh')
     call getmem2d(p2d,jdi1,jdi2,idi1,idi2,'moloch:p2d')
+!$acc enter data create(p2d)
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
     call getmem3d(wx,jce1,jce2,ice1,ice2,1,kz,'moloch:wx')
     call getmem3d(zdiv2,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'moloch:zdiv2')
+!$acc enter data create(zdiv2)
     call getmem3d(wwkw,jci1,jci2,ici1,ici2,1,kzp1,'moloch:wwkw')
     call getmem3d(wz,jci1,jci2,ice1gb,ice2gb,1,kz,'moloch:wz')
     call getmem2d(wfw,jci1,jci2,1,kzp1,'moloch:wfw')
@@ -625,7 +627,8 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
-!$acc parallel loop gang
+!$acc parallel present(zdiv2, p2d)
+!$acc loop gang
         do k = 1 , kz
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
@@ -809,7 +812,10 @@ module mod_moloch
           end if
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
           call divdamp(dtsound)
-          if ( do_filterdiv ) call filt3d
+          if ( do_filterdiv )
+!$acc update device(zdiv2)
+            call filt3d
+          end if
 !$acc parallel loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
