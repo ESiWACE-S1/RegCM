@@ -630,6 +630,7 @@ module mod_moloch
             cbdydiag = trac(jci1:jci2,ici1:ici2,:,:) - chiten0
           end if
         end if
+!$acc update device(ux, vx)
         call uvstagtox(u,v,ux,vx)
       end subroutine boundary
 
@@ -1069,6 +1070,7 @@ module mod_moloch
         real(rkx) :: dta
         real(rkx) , pointer , dimension(:,:,:) :: ptr
 
+!$acc update device(ux, vx)
         call uvstagtox(u,v,ux,vx)
 
         ! Compute W (and TKE if required) on zita levels
