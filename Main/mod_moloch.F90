@@ -134,7 +134,9 @@ module mod_moloch
     call getmem2d(zpbw,jci1,jce2ga,ici1,ici2,'moloch:zpbw')
     call getmem2d(mx2,jde1,jde2,ide1,ide2,'moloch:mx2')
     call getmem2d(rmu,jde1ga,jde2ga,ide1,ide2,'moloch:rmu')
+!$acc enter data create(rmu)
     call getmem2d(rmv,jde1,jde2,ide1ga,ide2ga,'moloch:rmv')
+!$acc enter data create(rmv)
     call getmem2d(coru,jde1,jde2,ice1,ice2,'moloch:coru')
     call getmem2d(corv,jce1,jce2,ide1,ide2,'moloch:corv')
     if ( ibltyp == 2 ) then
@@ -190,8 +192,10 @@ module mod_moloch
     call assignpnt(mo_atm%tetav,tetav)
 !$acc enter data create(tetav)
     call assignpnt(mo_atm%u,u)
+!$acc enter data create(u)
     call assignpnt(mo_atm%ux,ux)
     call assignpnt(mo_atm%v,v)
+!$acc enter data create(v)
     call assignpnt(mo_atm%vx,vx)
     call assignpnt(mo_atm%w,w)
     call assignpnt(mo_atm%tvirt,tvirt)
@@ -821,6 +825,7 @@ module mod_moloch
 !$acc end parallel
           end if
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(zdiv2)
           call divdamp(dtsound)
           if ( do_filterdiv ) then
 !$acc update device(zdiv2)
@@ -2065,7 +2070,8 @@ module mod_moloch
 
     ddamp1 = ddamp*0.125_rkx*dx**2/dts
     if ( lrotllr ) then
-!$acc parallel loop collapse(3)
+!$acc parallel present(u, rmu, zdiv2)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jdi1 , jdi2
@@ -2075,7 +2081,8 @@ module mod_moloch
         end do
       end do
 !$acc end parallel
-!$acc parallel loop collapse(3)
+!$acc parallel present(v, zdiv2)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = idi1 , idi2
           do j = jci1 , jci2
@@ -2086,7 +2093,8 @@ module mod_moloch
       end do
 !$acc end parallel
     else
-!$acc parallel loop collapse(3)
+!$acc parallel present(u, rmu, zdiv2)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jdi1 , jdi2
@@ -2096,7 +2104,8 @@ module mod_moloch
         end do
       end do
 !$acc end parallel
-!$acc parallel loop collapse(3)
+!$acc parallel present(v, rmv, zdiv2)
+!$accloop collapse(3)
       do k = 1 , kz
         do i = idi1 , idi2
           do j = jci1 , jci2
