@@ -188,6 +188,7 @@ module mod_moloch
     call assignpnt(mo_atm%pai,pai)
 !$acc enter data create(pai)
     call assignpnt(mo_atm%tetav,tetav)
+!$acc enter data create(tetav)
     call assignpnt(mo_atm%u,u)
     call assignpnt(mo_atm%ux,ux)
     call assignpnt(mo_atm%v,v)
@@ -239,7 +240,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 
-!$acc enter data create(p,t,pai,qsat,qv,tvirt,tetav)
+!$acc enter data create(p,t,qsat,qv,tvirt)
   end subroutine init_moloch
   !
   ! Moloch dynamical integration engine
@@ -386,8 +387,10 @@ module mod_moloch
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
+!$acc update host(tetav)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
         call filttheta
+!$acc update host(tetav)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
       end if
     end if
@@ -682,9 +685,12 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
+!$acc update host(tetav)
         call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(tetav)
 
-!$acc parallel loop gang
+!$acc parallel present(p2d, tetav)
+!$acc loop gang
         do k = 1 , kz
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
