@@ -812,7 +812,7 @@ module mod_moloch
           end if
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
           call divdamp(dtsound)
-          if ( do_filterdiv )
+          if ( do_filterdiv ) then
 !$acc update device(zdiv2)
             call filt3d
           end if
