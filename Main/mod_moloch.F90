@@ -1864,7 +1864,8 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u
     integer(ik4) :: i , j , k
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(u, ux)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jdii1 , jdii2
@@ -1875,7 +1876,8 @@ module mod_moloch
     end do
 !$acc end parallel
     if ( ma%has_bdyright ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
@@ -1884,7 +1886,8 @@ module mod_moloch
 !$acc end parallel
     end if
     if ( ma%has_bdyleft ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
