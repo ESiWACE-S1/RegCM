@@ -123,13 +123,16 @@ module mod_moloch
 !$acc enter data create(p2d)
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
+!$acc enter data create(s)
     call getmem3d(wx,jce1,jce2,ice1,ice2,1,kz,'moloch:wx')
 !$acc enter data create(wx)
     call getmem3d(zdiv2,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'moloch:zdiv2')
 !$acc enter data create(zdiv2)
     call getmem3d(wwkw,jci1,jci2,ici1,ici2,1,kzp1,'moloch:wwkw')
     call getmem3d(wz,jci1,jci2,ice1gb,ice2gb,1,kz,'moloch:wz')
+!$acc enter data create(wz)
     call getmem2d(wfw,jci1,jci2,1,kzp1,'moloch:wfw')
+!$acc enter data create(wfw)
     call getmem3d(p0,jce1gb,jce2gb,ici1,ici2,1,kz,'moloch:p0')
     call getmem2d(zpby,jci1,jci2,ici1,ice2ga,'moloch:zpby')
     call getmem2d(zpbw,jci1,jce2ga,ici1,ici2,'moloch:zpbw')
@@ -189,7 +192,9 @@ module mod_moloch
     call assignpnt(mddom%ht,ht)
     call assignpnt(sfs%psa,ps)
     call assignpnt(mo_atm%fmz,fmz)
+!$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
+!$acc enter data create(fmzf)
     call assignpnt(mo_atm%pai,pai)
 !$acc enter data create(pai)
     call assignpnt(mo_atm%tetav,tetav)
@@ -1153,14 +1158,15 @@ module mod_moloch
         end if
 
         ! Vertical advection
-!$acc parallel
+!$acc parallel present(wfw)
         do j = jci1 , jci2
           wfw(j,1) = d_zero
           wfw(j,kzp1) = d_zero
         end do
 !$acc end parallel
 
-!$acc parallel loop gang
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
+!$acc loop gang
         do i = ici1 , ici2
 !$acc loop seq
           do k = 1 , kzm1
