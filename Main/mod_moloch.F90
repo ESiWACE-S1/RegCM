@@ -142,6 +142,7 @@ module mod_moloch
     call getmem2d(corv,jce1,jce2,ide1,ide2,'moloch:corv')
     if ( ibltyp == 2 ) then
       call getmem3d(tkex,jce1,jce2,ice1,ice2,1,kz,'moloch:tkex')
+!$acc enter data create(tkex)
     end if
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
@@ -228,7 +229,10 @@ module mod_moloch
         end if
       end if
     end if
-    if ( ibltyp == 2 ) call assignpnt(mo_atm%tke,tke)
+    if ( ibltyp == 2 ) then
+        call assignpnt(mo_atm%tke,tke)
+!$acc enter data create(tke)
+    end if
     if ( ichem == 1 ) call assignpnt(mo_atm%trac,trac)
     if ( ifrayd == 1 ) then
 !$acc update device(zeta, zetau)
@@ -1814,7 +1818,8 @@ module mod_moloch
     i2 = ubound(wx,2)
     j1 = lbound(wx,1)
     j2 = ubound(wx,1)
-!$acc parallel loop collapse(3)
+!$acc parallel present(wx, w)
+!$acc loop collapse(3)
     do k = 2 , kzm1
       do i = i1 , i2
         do j = j1 , j2
@@ -1824,7 +1829,8 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc parallel loop collapse(2)
+!$acc parallel present(wx, w)
+!$acc loop collapse(2)
     do i = i1 , i2
       do j = j1 , j2
         wx(j,i,1)  = d_half * (w(j,i,2)+w(j,i,1))
