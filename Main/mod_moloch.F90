@@ -216,14 +216,20 @@ module mod_moloch
     call assignpnt(mo_atm%w,w)
 !$acc enter data create(w)
     call assignpnt(mo_atm%tvirt,tvirt)
+!$acc enter data create(tvirt)
     call assignpnt(mo_atm%zeta,zeta)
 !$acc enter data create(zeta)
     call assignpnt(mo_atm%p,p)
+!$acc enter data create(p)
     call assignpnt(mo_atm%t,t)
+!$acc enter data create(t)
     call assignpnt(mo_atm%rho,rho)
     call assignpnt(mo_atm%qx,qx)
+!$acc enter data create(qx)
     call assignpnt(mo_atm%qs,qsat)
+!$acc enter data create(qsat)
     call assignpnt(mo_atm%qx,qv,iqv)
+!$acc enter data create(qv)
     if ( ipptls > 0 ) then
       call assignpnt(mo_atm%qx,qc,iqc)
 !$acc enter data create(qc)
@@ -244,7 +250,10 @@ module mod_moloch
         call assignpnt(mo_atm%tke,tke)
 !$acc enter data create(tke)
     end if
-    if ( ichem == 1 ) call assignpnt(mo_atm%trac,trac)
+    if ( ichem == 1 ) then
+        call assignpnt(mo_atm%trac,trac)
+!$acc enter data create(trac)
+    end if
     if ( ifrayd == 1 ) then
 !$acc update device(zeta, zetau)
         call xtoustag(zeta,zetau)
@@ -266,9 +275,8 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
-
-!$acc enter data create(p,t,qsat,qv,tvirt)
   end subroutine init_moloch
+
   !
   ! Moloch dynamical integration engine
   !
@@ -1486,7 +1494,8 @@ module mod_moloch
 !$acc end parallel
 
           if ( ma%has_bdyleft ) then
-!$acc parallel
+!$acc parallel present(p0)
+!$acc loop collapse(2)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce1,i,k) = p0(jci1,i,k)
@@ -1496,7 +1505,8 @@ module mod_moloch
           end if
 
           if ( ma%has_bdyright ) then
-!$acc parallel
+!$acc parallel present(p0)
+!$acc loop collapse(2)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce2,i,k) = p0(jci2,i,k)
@@ -1505,11 +1515,14 @@ module mod_moloch
 !$acc end parallel
           end if
 
+!$acc update host(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
 
           ! Zonal advection
 
-!$acc parallel loop gang
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0)
+!$acc loop gang
           do k = 1 , kz
 !$acc loop vector
             do i = ici1 , ici2
