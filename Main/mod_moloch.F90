@@ -194,9 +194,11 @@ module mod_moloch
     call assignpnt(mo_atm%u,u)
 !$acc enter data create(u)
     call assignpnt(mo_atm%ux,ux)
+!$acc enter data create(ux)
     call assignpnt(mo_atm%v,v)
 !$acc enter data create(v)
     call assignpnt(mo_atm%vx,vx)
+!$acc enter data create(vx)
     call assignpnt(mo_atm%w,w)
     call assignpnt(mo_atm%tvirt,tvirt)
     call assignpnt(mo_atm%zeta,zeta)
@@ -1999,11 +2001,14 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
+!$acc update host(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
+!$acc update device(u, v)
 
     ! Compute U-wind on T points
-!$acc parallel loop collapse(3)
+!$acc parallel present(ux, u)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jci1 , jci2
@@ -2014,7 +2019,8 @@ module mod_moloch
     end do
 !$acc end parallel
     if ( ma%has_bdyleft ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce1,i,k) = d_half * (u(jde1,i,k)+u(jdi1,i,k))
@@ -2023,7 +2029,8 @@ module mod_moloch
 !$acc end parallel
     end if
     if ( ma%has_bdyright ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce2,i,k) = d_half*(u(jde2,i,k) + u(jdi2,i,k))
@@ -2031,8 +2038,10 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
+
     ! Compute V-wind on T points
-!$acc parallel loop collapse(3)
+!$acc parallel present(vx, v)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jce1 , jce2
@@ -2043,7 +2052,8 @@ module mod_moloch
     end do
 !$acc end parallel
     if ( ma%has_bdybottom ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice1,k) = d_half * (v(j,ide1,k)+v(j,idi1,k))
@@ -2052,7 +2062,8 @@ module mod_moloch
 !$acc end parallel
     end if
     if ( ma%has_bdytop ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice2,k) = d_half*(v(j,ide2,k) + v(j,idi2,k))
