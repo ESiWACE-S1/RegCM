@@ -134,7 +134,9 @@ module mod_moloch
     call getmem2d(wfw,jci1,jci2,1,kzp1,'moloch:wfw')
 !$acc enter data create(wfw)
     call getmem3d(p0,jce1gb,jce2gb,ici1,ici2,1,kz,'moloch:p0')
+!$acc enter data create(p0)
     call getmem2d(zpby,jci1,jci2,ici1,ice2ga,'moloch:zpby')
+!$acc enter data create(zpby)
     call getmem2d(zpbw,jci1,jce2ga,ici1,ici2,'moloch:zpbw')
     call getmem2d(mx2,jde1,jde2,ide1,ide2,'moloch:mx2')
     call getmem2d(rmu,jde1ga,jde2ga,ide1,ide2,'moloch:rmu')
@@ -185,6 +187,7 @@ module mod_moloch
     call assignpnt(mddom%msfu,mu)
     call assignpnt(mddom%msfv,mv)
     call assignpnt(mddom%msfx,mx)
+!$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
     call assignpnt(mddom%hy,hy)
     call assignpnt(mddom%xlat,xlat)
@@ -1219,7 +1222,8 @@ module mod_moloch
 !$acc end parallel
 
         if ( do_vadvtwice ) then
-!$acc parallel loop gang
+!$acc parallel present(fmzf, wz, wfw, s, fmz)
+!$acc loop gang
           do i = ici1 , ici2
 !$acc loop seq
             do k = 1 , kzm1
@@ -1273,7 +1277,7 @@ module mod_moloch
         end if
 
         if ( ma%has_bdybottom ) then
-!$acc parallel
+!$acc parallel present(wz)
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice1,k) = wz(j,ici1,k)
@@ -1282,7 +1286,7 @@ module mod_moloch
 !$acc end parallel
         end if
         if ( ma%has_bdytop ) then
-!$acc parallel
+!$acc parallel present(wz)
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice2,k) = wz(j,ici2,k)
@@ -1291,13 +1295,16 @@ module mod_moloch
 !$acc end parallel
         end if
 
+!$acc update host(wz)
         call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
+!$acc update device(wz)
 
         if ( lrotllr ) then
 
           ! Meridional advection
 
-!$acc parallel loop gang
+!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
+!$acc loop gang
           do k = 1 , kz
 !$acc loop seq
             do i = ici1 , ice2ga
