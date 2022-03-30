@@ -138,6 +138,7 @@ module mod_moloch
     call getmem2d(zpby,jci1,jci2,ici1,ice2ga,'moloch:zpby')
 !$acc enter data create(zpby)
     call getmem2d(zpbw,jci1,jce2ga,ici1,ici2,'moloch:zpbw')
+!$acc enter data create(zpbw)
     call getmem2d(mx2,jde1,jde2,ide1,ide2,'moloch:mx2')
     call getmem2d(rmu,jde1ga,jde2ga,ide1,ide2,'moloch:rmu')
 !$acc enter data create(rmu)
@@ -185,6 +186,7 @@ module mod_moloch
   subroutine init_moloch
     implicit none
     call assignpnt(mddom%msfu,mu)
+!$acc enter data create(mu)
     call assignpnt(mddom%msfv,mv)
     call assignpnt(mddom%msfx,mx)
 !$acc enter data create(mx)
@@ -1354,7 +1356,7 @@ module mod_moloch
 !$acc end parallel
 
           if ( ma%has_bdyleft ) then
-!$acc parallel
+!$acc parallel present(p0)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce1,i,k) = p0(jci1,i,k)
@@ -1364,7 +1366,7 @@ module mod_moloch
           end if
 
           if ( ma%has_bdyright ) then
-!$acc parallel
+!$acc parallel present(p0)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce2,i,k) = p0(jci2,i,k)
@@ -1377,7 +1379,8 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc parallel loop gang
+!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
+!$acc loop gang
           do k = 1 , kz
 !$acc loop vector
             do i = ici1 , ici2
