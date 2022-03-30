@@ -186,6 +186,7 @@ module mod_moloch
     call assignpnt(mo_atm%fmz,fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
     call assignpnt(mo_atm%pai,pai)
+!$acc enter data create(pai)
     call assignpnt(mo_atm%tetav,tetav)
     call assignpnt(mo_atm%u,u)
     call assignpnt(mo_atm%ux,ux)
@@ -652,9 +653,12 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
+!$acc update host(pai)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(pai)
 
-!$acc parallel loop gang
+!$acc parallel present(p2d, pai)
+!$acc loop gang
         do k = 1 , kz
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
