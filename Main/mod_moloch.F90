@@ -124,6 +124,7 @@ module mod_moloch
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
     call getmem3d(wx,jce1,jce2,ice1,ice2,1,kz,'moloch:wx')
+!$acc enter data create(wx)
     call getmem3d(zdiv2,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'moloch:zdiv2')
 !$acc enter data create(zdiv2)
     call getmem3d(wwkw,jci1,jci2,ici1,ici2,1,kzp1,'moloch:wwkw')
@@ -201,6 +202,7 @@ module mod_moloch
     call assignpnt(mo_atm%vx,vx)
 !$acc enter data create(vx)
     call assignpnt(mo_atm%w,w)
+!$acc enter data create(w)
     call assignpnt(mo_atm%tvirt,tvirt)
     call assignpnt(mo_atm%zeta,zeta)
 !$acc enter data create(zeta)
@@ -1838,7 +1840,8 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
     integer(ik4) :: i , j , k
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(w, wx)
+!$acc loop collapse(3)
     do k = 3 , kzm1
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -1848,7 +1851,8 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc parallel loop collapse(2)
+!$acc parallel present(w, wx)
+!$acc loop collapse(2)
     do i = ice1 , ice2
       do j = jce1 , jce2
         w(j,i,2) = d_half * (wx(j,i,2)  +wx(j,i,1))
