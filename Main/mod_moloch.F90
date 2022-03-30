@@ -157,6 +157,7 @@ module mod_moloch
     if ( ifrayd == 1 ) then
       call getmem3d(zetau,jdi1,jdi2,ici1,ici2,1,kz,'moloch:zetau')
       call getmem3d(zetav,jci1,jci2,idi1,idi2,1,kz,'moloch:zetav')
+!$acc enter data create(zetau, zetav)
     end if
     do_filterpai = mo_filterpai
     if ( do_fulleq ) then
@@ -202,6 +203,7 @@ module mod_moloch
     call assignpnt(mo_atm%w,w)
     call assignpnt(mo_atm%tvirt,tvirt)
     call assignpnt(mo_atm%zeta,zeta)
+!$acc enter data create(zeta)
     call assignpnt(mo_atm%p,p)
     call assignpnt(mo_atm%t,t)
     call assignpnt(mo_atm%rho,rho)
@@ -227,7 +229,9 @@ module mod_moloch
     if ( ibltyp == 2 ) call assignpnt(mo_atm%tke,tke)
     if ( ichem == 1 ) call assignpnt(mo_atm%trac,trac)
     if ( ifrayd == 1 ) then
-      call xtoustag(zeta,zetau)
+!$acc update device(zeta, zetau)
+        call xtoustag(zeta,zetau)
+!$acc update device(zeta, zetav)
       call xtovstag(zeta,zetav)
     end if
     coru = eomeg2*sin(mddom%ulat(jde1:jde2,ice1:ice2)*degrad)
@@ -1896,7 +1900,8 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: v
     integer(ik4) :: i , j , k
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(v, vx)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = idii1 , idii2
         do j = jci1 , jci2
@@ -1907,7 +1912,8 @@ module mod_moloch
     end do
 !$acc end parallel
     if ( ma%has_bdytop ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
@@ -1916,7 +1922,8 @@ module mod_moloch
 !$acc end parallel
     end if
     if ( ma%has_bdybottom ) then
-!$acc parallel loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
