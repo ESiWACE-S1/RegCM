@@ -118,10 +118,13 @@ module mod_moloch
   subroutine allocate_moloch
     implicit none
     call getmem1d(gzitak,1,kzp1,'moloch:gzitak')
+!$acc enter data create(gzitak)
     call getmem1d(gzitakh,1,kz,'moloch:gzitakh')
+!$acc enter data create(gzitakh)
     call getmem2d(p2d,jdi1,jdi2,idi1,idi2,'moloch:p2d')
 !$acc enter data create(p2d)
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
+!$acc enter data create(deltaw)
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
 !$acc enter data create(s)
     call getmem3d(wx,jce1,jce2,ice1,ice2,1,kz,'moloch:wx')
@@ -129,6 +132,7 @@ module mod_moloch
     call getmem3d(zdiv2,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'moloch:zdiv2')
 !$acc enter data create(zdiv2)
     call getmem3d(wwkw,jci1,jci2,ici1,ici2,1,kzp1,'moloch:wwkw')
+!$acc enter data create(wwkw)
     call getmem3d(wz,jci1,jci2,ice1gb,ice2gb,1,kz,'moloch:wz')
 !$acc enter data create(wz)
     call getmem2d(wfw,jci1,jci2,1,kzp1,'moloch:wfw')
@@ -146,6 +150,7 @@ module mod_moloch
     call getmem2d(rmv,jde1,jde2,ide1ga,ide2ga,'moloch:rmv')
 !$acc enter data create(rmv)
     call getmem2d(coru,jde1,jde2,ice1,ice2,'moloch:coru')
+!$acc enter data create(coru)
     call getmem2d(corv,jce1,jce2,ide1,ide2,'moloch:corv')
     if ( ibltyp == 2 ) then
       call getmem3d(tkex,jce1,jce2,ice1,ice2,1,kz,'moloch:tkex')
@@ -163,6 +168,7 @@ module mod_moloch
     end if
     call getmem3d(ud,jde1ga,jde2ga,ice1ga,ice2ga,1,kz,'moloch:ud')
     call getmem3d(vd,jce1ga,jce2ga,ide1ga,ide2ga,1,kz,'moloch:vd')
+!$acc enter data create(vd)
     if ( ifrayd == 1 ) then
       call getmem3d(zetau,jdi1,jdi2,ici1,ici2,1,kz,'moloch:zetau')
       call getmem3d(zetav,jci1,jci2,idi1,idi2,1,kz,'moloch:zetav')
@@ -192,7 +198,9 @@ module mod_moloch
     call assignpnt(mddom%msfx,mx)
 !$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
+!$acc enter data create(hx)
     call assignpnt(mddom%hy,hy)
+!$acc enter data create(hy)
     call assignpnt(mddom%xlat,xlat)
     call assignpnt(mddom%xlon,xlon)
     call assignpnt(mddom%ht,ht)
@@ -774,20 +782,25 @@ module mod_moloch
         !  sound waves
 
         if ( .not. do_fulleq ) then
+!$acc update host(tetav)
           call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(tetav)
         end if
 
         do jsound = 1 , nsound
 
           ! partial definition of the generalized vertical velocity
 
+!$acc update host(u, v)
           call exchange(u,1,jde1,jde2,ice1,ice2,1,kz)
           call exchange(v,1,jce1,jce2,ide1,ide2,1,kz)
 
           ud(:,:,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
           vd(:,:,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
+!$acc update device(u, v)
 
-!$acc parallel loop collapse(2)
+!$acc parallel present(u, hx, v, hy, w)
+!$acc loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               zuh = u(j,i,kz) * hx(j,i) + u(j+1,i,kz) * hx(j+1,i)
@@ -796,7 +809,8 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
-!$acc parallel loop collapse(2)
+!$acc parallel present(s, w)
+!$acc loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               s(j,i,kzp1) = -w(j,i,kzp1)
@@ -806,7 +820,8 @@ module mod_moloch
 
           ! Equation 10, generalized vertical velocity
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(u, hx, v, hy, s, gzitak)
+!$acc loop collapse(3)
           do k = kz , 2 , -1
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -824,7 +839,8 @@ module mod_moloch
           ! Equation 16
 
           if ( lrotllr ) then
-!$acc parallel loop collapse(3)
+!$acc parallel present(fmz, u, v, rmv, zdiv2, mx)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -842,7 +858,8 @@ module mod_moloch
             end do
 !$acc end parallel
           else
-!$acc parallel loop collapse(3)
+!$acc parallel present(fmz, u, rmu, v, rmv, zdiv2, mx2)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -860,14 +877,15 @@ module mod_moloch
             end do
 !$acc end parallel
           end if
+!$acc update host(zdiv2)
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(zdiv2)
           call divdamp(dtsound)
           if ( do_filterdiv ) then
-!$acc update device(zdiv2)
             call filt3d
           end if
-!$acc parallel loop collapse(3)
+!$acc parallel present(zdiv2, fmz, s)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -881,7 +899,9 @@ module mod_moloch
           ! new w (implicit scheme) from Equation 19
 
           do k = kz , 2 , -1
-!$acc parallel loop collapse(2)
+!TODO: ffilt is initialized in another module
+!$acc parallel present(deltaw, w, fmzf, tetav, qsat, t, pai, zdiv2, fmz, ffilt, wwkw)
+!$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 deltaw(j,i,k) = -w(j,i,k)
@@ -922,7 +942,8 @@ module mod_moloch
 
           ! 2nd loop for the tridiagonal inversion
           do k = 2 , kz
-!$acc parallel loop collapse(2)
+!$acc parallel present(w, wwkw, deltaw)
+!$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
@@ -933,7 +954,8 @@ module mod_moloch
           end do
 
           ! new Exner function (Equation 19)
-!$acc parallel loop collapse(3)
+!$acc parallel present(zdiv2, fmz, w)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -946,7 +968,8 @@ module mod_moloch
 
           if ( do_fulleq ) then
             if ( ipptls > 0 ) then
-!$acc parallel loop collapse(3)
+!$acc parallel present(zdiv2, qv, qc, tetav, qwltot, qwitot)
+!$acc loop collapse(3)
               do k = 1 , kz
                 do i = ici1 , ici2
                   do j = jci1 , jci2
@@ -964,13 +987,16 @@ module mod_moloch
                 end do
               end do
 !$acc end parallel
+!$acc update host(tetav)
               call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(tetav)
             end if
           end if
 
           ! horizontal momentum equations
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(pai, zdiv2)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -980,12 +1006,15 @@ module mod_moloch
           end do
 !$acc end parallel
 
+!$acc update host(pai, deltaw)
           call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
           call exchange_lrbt(deltaw,1,jce1,jce2,ice1,ice2,1,kzp1)
+!$acc update device(pai, deltaw)
 
           if ( lrotllr ) then
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jdi1 , jdi2
@@ -1005,7 +1034,8 @@ module mod_moloch
             end do
 !$acc end parallel
             zcy = zdtrdy
-!$acc parallel loop collapse(3)
+!$acc parallel present(deltaw, tetav, corv, ud, v, hy, gzitakh, pai)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
                 do j = jci1 , jci2
@@ -1026,7 +1056,8 @@ module mod_moloch
 
           else
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jdi1 , jdi2
@@ -1045,7 +1076,8 @@ module mod_moloch
               end do
             end do
 !$acc end parallel
-!$acc parallel loop collapse(3)
+!$acc parallel present(mv, deltaw, tetav, corv, ud, v, hy, gzitakh, pai)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
                 do j = jci1 , jci2
@@ -1071,7 +1103,8 @@ module mod_moloch
         ! complete computation of generalized vertical velocity
         ! Complete Equation 10
 
-!$acc parallel loop collapse(3)
+!$acc parallel present(s, w, fmzf)
+!$acc loop collapse(3)
         do k = 2 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -1080,14 +1113,16 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc parallel loop collapse(2)
+!$acc parallel present(s)
+!$acc loop collapse(2)
         do i = ici1 , ici2
           do j = jci1 , jci2
             s(j,i,1) = d_zero
           end do
         end do
 !$acc end parallel
-!$acc parallel loop collapse(2)
+!$acc parallel present(s)
+!$acc loop collapse(2)
         do i = ici1 , ici2
           do j = jci1 , jci2
             s(j,i,kzp1) = d_zero
