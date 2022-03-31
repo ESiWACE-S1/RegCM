@@ -607,14 +607,18 @@ module mod_moloch
       subroutine boundary
         implicit none
 
+!$acc update host(ps, u, v, t, qv, pai)
         call exchange_lrbt(ps,1,jce1,jce2,ice1,ice2)
         call exchange_lrbt(u,1,jde1,jde2,ice1,ice2,1,kz)
         call exchange_lrbt(v,1,jce1,jce2,ide1,ide2,1,kz)
         call exchange_lrbt(t,1,jce1,jce2,ice1,ice2,1,kz)
         call exchange_lrbt(qv,1,jce1,jce2,ice1,ice2,1,kz)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(ps, u, v, t, qv, pai)
         if ( ichem == 1 ) then
+!$acc update host(trac)
           call exchange_lrbt(trac,1,jce1,jce2,ice1,ice2,1,kz,1,ntr)
+!$acc update device(trac)
         end if
 
         if ( idiag > 0 ) then
@@ -1423,7 +1427,9 @@ module mod_moloch
 !$acc end parallel
           end if
 
+!$acc update host(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
 
           ! Zonal advection
 
