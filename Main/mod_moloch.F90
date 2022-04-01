@@ -412,6 +412,7 @@ module mod_moloch
 !$acc update device(trac)
 !$acc kernels present(chiten0, trac)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+!$acc end kernels
       end if
     end if
 
