@@ -1612,7 +1612,7 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc parallel present(rmu, pp, mx2, zpbw, u, p0)
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
 !$acc loop gang
           do k = 1 , kz
 !$acc loop vector
