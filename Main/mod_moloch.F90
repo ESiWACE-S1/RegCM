@@ -189,6 +189,7 @@ module mod_moloch
     end if
     if ( do_filtertheta ) then
       call getmem3d(tf,jce1,jce2,ice1,ice2,1,kz,'moloch:tf')
+!$acc enter data create(tf)
     end if
   end subroutine allocate_moloch
 
@@ -445,21 +446,21 @@ module mod_moloch
     end do ! Advection loop
 
     if ( do_filterpai ) then
-!$acc kernels present(pai)
+!$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) - pf
 !$acc end kernels
       call filtpai
-!$acc kernels present(pai)
+!$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
 !$acc end kernels
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
-!$acc kernels present(tetav)
+!$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
 !$acc end kernels
         call filttheta
-!$acc kernels present(tetav)
+!$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
 !$acc end kernels
       end if
