@@ -1536,7 +1536,7 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc parallel present(rmv, pp, v, zpby, wz, mx2, p0)
+!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
 !$acc loop gang
           do k = 1 , kz
 !$acc loop seq
