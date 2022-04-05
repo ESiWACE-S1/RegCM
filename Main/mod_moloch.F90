@@ -954,7 +954,7 @@ module mod_moloch
 
           do k = kz , 2 , -1
 !TODO: ffilt is initialized in another module
-!$acc parallel present(deltaw, w, fmzf, tetav, qsat, t, pai, zdiv2, fmz, ffilt, wwkw)
+!$acc parallel present(deltaw, w, fmzf, tetav, qv, qsat, t, pai, zdiv2, fmz, ffilt, wwkw)
 !$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
