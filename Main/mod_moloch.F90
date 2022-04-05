@@ -185,6 +185,7 @@ module mod_moloch
     end if
     if ( do_filterpai ) then
       call getmem3d(pf,jce1,jce2,ice1,ice2,1,kz,'moloch:pf')
+!$acc enter data create(pf)
     end if
     if ( do_filtertheta ) then
       call getmem3d(tf,jce1,jce2,ice1,ice2,1,kz,'moloch:tf')
