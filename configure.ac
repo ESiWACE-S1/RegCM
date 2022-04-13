@@ -122,12 +122,23 @@ fi
 USE_OPENACC="0"
 # TODO: make this configurable
 PGI_GPU_ARCH="cc80"
+
 AC_ARG_ENABLE(openacc,
   AC_HELP_STRING([--enable-openacc],
                  [Compile OpenACC directives (only for PGI fortran compilation)]),
                  [USE_OPENACC="1"]
 )
 if eval "test x"$USE_OPENACC" = x1"; then
+  AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
+  AC_SUBST(AM_CPPFLAGS)
+fi
+
+AC_ARG_ENABLE(openacc-debug,
+  AC_HELP_STRING([--enable-openacc-debug],
+                 [Compile OpenACC directives with autocompare (only for PGI fortran compilation)]),
+                 [USE_OPENACC="2"]
+)
+if eval "test x"$USE_OPENACC" = x2"; then
   AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
   AC_SUBST(AM_CPPFLAGS)
 fi
@@ -637,9 +648,13 @@ else
   if test -z "$COMPILER_PGI_TRUE"; then
     NOOPTFC="-O1 $FCFLAGS"
     FCFLAGS="-O3 -fastsse $FCFLAGS"
-    if test "test x$USE_OPENACC = x1"; then
+    if eval "test x"$USE_OPENACC" = x1"; then
       FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH -Minfo=accel"
       NOOPTFC="$NOOPTFC -acc -ta=tesla:$PGI_GPU_ARCH -Minfo=accel"
+    fi
+    if eval "test x"$USE_OPENACC" = x2"; then
+      FCFLAGS="$NOOPTFC -acc -ta=tesla:"${PGI_GPU_ARCH}",autocompare -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc -ta=tesla:"${PGI_GPU_ARCH}",autocompare -Minfo=accel"
     fi
     AC_SUBST(FCFLAGS)
     AC_SUBST(NOOPTFC)
