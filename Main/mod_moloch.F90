@@ -123,7 +123,7 @@ module mod_moloch
     call getmem1d(gzitakh,1,kz,'moloch:gzitakh')
 !!$acc enter data create(gzitakh)
     call getmem2d(p2d,jdi1,jdi2,idi1,idi2,'moloch:p2d')
-!!$acc enter data create(p2d)
+!$acc enter data create(p2d)
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
 !!$acc enter data create(deltaw)
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
@@ -207,7 +207,7 @@ module mod_moloch
     call assignpnt(mddom%xlon,xlon)
     call assignpnt(mddom%ht,ht)
     call assignpnt(sfs%psa,ps)
-!!$acc enter data create(ps)
+!$acc enter data create(ps)
     call assignpnt(mo_atm%fmz,fmz)
 !!$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
@@ -229,13 +229,13 @@ module mod_moloch
     call assignpnt(mo_atm%tvirt,tvirt)
 !$acc enter data create(tvirt)
     call assignpnt(mo_atm%zeta,zeta)
-!!$acc enter data create(zeta)
+!$acc enter data create(zeta)
     call assignpnt(mo_atm%p,p)
 !$acc enter data create(p)
     call assignpnt(mo_atm%t,t)
 !$acc enter data create(t)
     call assignpnt(mo_atm%rho,rho)
-!!$acc enter data create(rho)
+!$acc enter data create(rho)
     call assignpnt(mo_atm%qx,qx)
 !!$acc enter data create(qx)
     call assignpnt(mo_atm%qs,qsat)
@@ -287,7 +287,8 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
-!!$acc update device(w, gzitak, gzitakh)
+! Static arrays transfers to GPU
+!$acc update device(zeta)
   end subroutine init_moloch
 
   !
@@ -414,15 +415,15 @@ module mod_moloch
     end if
 
     if ( do_filterpai ) then
-!!$acc kernels present(pf, pai)
+!$acc kernels present(pf, pai)
       pf = pai(jce1:jce2,ice1:ice2,:)
-!!$acc end kernels
+!$acc end kernels
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
-!!$acc kernels present(tf, tetav)
+!$acc kernels present(tf, tetav)
         tf = tetav(jce1:jce2,ice1:ice2,:)
-!!$acc end kernels
+!$acc end kernels
       end if
     end if
 
@@ -434,29 +435,33 @@ module mod_moloch
 
     end do ! Advection loop
 
+!$acc update device(pai, tetav)
+
     if ( do_filterpai ) then
-!!$acc kernels present(pai, pf)
+!$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) - pf
-!!$acc end kernels
+!$acc end kernels
       call filtpai
-!!$acc kernels present(pai, pf)
+!$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
-!!$acc end kernels
+!$acc end kernels
+!$acc update self(pai)
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
-!!$acc kernels present(tetav, tf)
+!$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
-!!$acc end kernels
+!$acc end kernels
         call filttheta
-!!$acc kernels present(tetav, tf)
+!$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
-!!$acc end kernels
+!$acc end kernels
+!$acc update self(tetav)
       end if
     end if
 
-!!$acc parallel present(tvirt, tetav, pai)
-!!$acc loop collapse(3)
+!$acc parallel present(tvirt, tetav, pai)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -464,12 +469,14 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
+!$acc update self(tvirt)
 
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
-!!$acc parallel present(t, tvirt, qv, qc, qi, qr, qs)
-!!$acc loop collapse(3)
+!$acc update device(qv, qc, qi, qr, qs)
+!$acc parallel present(t, tvirt, qv, qc, qi, qr, qs)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -478,10 +485,11 @@ module mod_moloch
             end do
           end do
         end do
-!!$acc end parallel
+!$acc end parallel
       else
-!!$acc parallel present(t, tvirt, qv, qc)
-!!$acc loop collapse(3)
+!$acc update device(qv, qc)
+!$acc parallel present(t, tvirt, qv, qc)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -489,11 +497,11 @@ module mod_moloch
             end do
           end do
         end do
-!!$acc end parallel
+!$acc end parallel
       end if
     else
-!!$acc parallel present(t, tvirt, qv)
-!!$acc loop collapse(3)
+!$acc parallel present(t, tvirt, qv)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
@@ -501,25 +509,23 @@ module mod_moloch
           end do
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
+!$acc update self(t)
 
     if ( idiag > 0 ) then
-!TODO: parallelize this section
-!!$acc update host(t, ten0)
+!$acc update self(qv)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
     end if
 
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
-!TODO: parallelize this section
-!!$acc update host(trac, chiten0)
         cadvhdiag = (trac(jci1:jci2,ici1:ici2,:,:) - chiten0) * rdt
       end if
     end if
-!!$acc parallel present(p, pai, rho, t)
-!!$acc loop collapse(3)
+!$acc parallel present(p, pai, rho, t)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -528,12 +534,12 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
+!$acc update self(p,rho)
 
     !jday = yeardayfrac(rcmtimer%idate)
-!!$acc update device(zeta)
-!!$acc parallel present(zeta, tvirt, ps, p)
-!!$acc loop collapse(2)
+!$acc parallel present(zeta, tvirt, ps, p)
+!$acc loop collapse(2)
     do i = ice1 , ice2
       do j = jce1 , jce2
         zdgz = zeta(j,i,kz)*egrav
@@ -544,12 +550,13 @@ module mod_moloch
         ps(j,i) = p(j,i,kz) * exp(zdgz/(rgas*tv))
       end do
     end do
-!!!$acc end parallel
+!$acc end parallel
+!$acc update self(ps)
     !
     ! Recompute saturation
     !
-!!$acc parallel present(qsat, t, p)
-!!$acc loop collapse(3)
+!$acc parallel present(qsat, t, p)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -557,7 +564,8 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
+!$acc update self(qsat)
     !
     ! Mass check
     !
@@ -747,14 +755,14 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
-!!$acc update host(pai)
+!$acc update self(pai)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
-!!$acc update device(pai)
+!$acc update device(pai)
 
-!!$acc parallel present(p2d, pai)
-!!$acc loop gang
+!$acc parallel present(p2d, pai)
+!$acc loop seq
         do k = 1 , kz
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (pai(j-1,i,k) + pai(j+1,i,k) + &
@@ -762,28 +770,28 @@ module mod_moloch
                          d_half   * pai(j,i,k)
             end do
           end do
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               pai(j,i,k) = pai(j,i,k) + nupait * p2d(j,i)
             end do
           end do
         end do
-!!$acc end parallel
+!$acc end parallel
       end subroutine filtpai
 
       subroutine filttheta
         implicit none
         integer(ik4) :: j , i , k
 
-!!$acc update host(tetav)
+!$acc update self(tetav)
         call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
-!!$acc update device(tetav)
+!$acc update device(tetav)
 
-!!$acc parallel present(p2d, tetav)
-!!$acc loop gang
+!$acc parallel present(p2d, tetav)
+!$acc loop seq
         do k = 1 , kz
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (tetav(j-1,i,k) + tetav(j+1,i,k) + &
@@ -791,14 +799,14 @@ module mod_moloch
                          d_half   * tetav(j,i,k)
             end do
           end do
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               tetav(j,i,k) = tetav(j,i,k) + nupait * p2d(j,i)
             end do
           end do
         end do
-!!$acc end parallel
+!$acc end parallel
       end subroutine filttheta
 
       subroutine sound(dts)
