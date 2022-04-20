@@ -160,10 +160,12 @@ module mod_moloch
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
       call getmem3d(qen0,jci1,jci2,ici1,ici2,1,kz,'moloch:qen0')
+!!$acc enter data create(ten0, qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
         call getmem4d(chiten0,jci1,jci2,ici1,ici2,1,kz,1,ntr,'moloch:chiten0')
+!!$acc enter data create(chiten0)
       end if
     end if
     call getmem3d(ud,jde1ga,jde2ga,ice1ga,ice2ga,1,kz,'moloch:ud')
@@ -405,12 +407,16 @@ module mod_moloch
 !$acc update self(tetav)
 
     if ( idiag > 0 ) then
+!!$acc kernels present(t, ten0, qv, qen0)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
+!!$acc end kernels
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
+!!$acc kernels present(trac, chiten0)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+!!$acc end kernels
       end if
     end if
 
