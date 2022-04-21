@@ -660,7 +660,7 @@ module mod_moloch
       subroutine boundary
         implicit none
 
-!!$acc update host(ps, u, v, t, qv, pai)
+!!$acc update self(ps, u, v, t, qv, pai)
         call exchange_lrbt(ps,1,jce1,jce2,ice1,ice2)
         call exchange_lrbt(u,1,jde1,jde2,ice1,ice2,1,kz)
         call exchange_lrbt(v,1,jce1,jce2,ide1,ide2,1,kz)
@@ -669,7 +669,7 @@ module mod_moloch
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
 !!$acc update device(ps, u, v, t, qv, pai)
         if ( ichem == 1 ) then
-!!$acc update host(trac)
+!!$acc update self(trac)
           call exchange_lrbt(trac,1,jce1,jce2,ice1,ice2,1,kz,1,ntr)
 !!$acc update device(trac)
         end if
@@ -835,7 +835,7 @@ module mod_moloch
         !  sound waves
 
         if ( .not. do_fulleq ) then
-!!$acc update host(tetav)
+!!$acc update self(tetav)
           call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
 !!$acc update device(tetav)
         end if
@@ -844,7 +844,7 @@ module mod_moloch
 
           ! partial definition of the generalized vertical velocity
 
-!!$acc update host(u, v)
+!!$acc update self(u, v)
           call exchange(u,1,jde1,jde2,ice1,ice2,1,kz)
           call exchange(v,1,jce1,jce2,ide1,ide2,1,kz)
 !!$acc update device(u, v)
@@ -932,7 +932,7 @@ module mod_moloch
             end do
 !!$acc end parallel
           end if
-!!$acc update host(zdiv2)
+!!$acc update self(zdiv2)
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
 !!$acc update device(zdiv2)
           call divdamp(dtsound)
@@ -1041,7 +1041,7 @@ module mod_moloch
                 end do
               end do
 !!$acc end parallel
-!!$acc update host(tetav)
+!!$acc update self(tetav)
               call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
 !!$acc update device(tetav)
             end if
@@ -1060,7 +1060,7 @@ module mod_moloch
           end do
 !!$acc end parallel
 
-!!$acc update host(pai, deltaw)
+!!$acc update self(pai, deltaw)
           call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
           call exchange_lrbt(deltaw,1,jce1,jce2,ice1,ice2,1,kzp1)
 !!$acc update device(pai, deltaw)
@@ -1392,7 +1392,7 @@ module mod_moloch
 !$acc end parallel
         end if
 
-!$acc update host(wz)
+!$acc update self(wz)
         call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
 !$acc update device(wz)
 
@@ -1470,7 +1470,7 @@ module mod_moloch
 !$acc end parallel
           end if
 
-!$acc update host(p0)
+!$acc update self(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
 !$acc update device(p0)
 
@@ -1599,7 +1599,7 @@ module mod_moloch
 !$acc end parallel
           end if
 
-!$acc update host(p0)
+!$acc update self(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
 !$acc update device(p0)
 
@@ -2075,7 +2075,7 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     integer(ik4) :: i , j , k
 
-!!$acc update host(ux, vx)
+!!$acc update self(ux, vx)
     call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
     call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
 !!$acc update device(ux, vx)
@@ -2153,7 +2153,7 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
-!!$acc update host(u, v)
+!!$acc update self(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
 !!$acc update device(u, v)
