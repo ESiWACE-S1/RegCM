@@ -262,7 +262,7 @@ module mod_moloch
     end if
     if ( ibltyp == 2 ) then
         call assignpnt(mo_atm%tke,tke)
-!!$acc enter data create(tke)
+!$acc enter data create(tke)
     end if
     if ( ichem == 1 ) then
         call assignpnt(mo_atm%trac,trac)
