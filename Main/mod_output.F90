@@ -257,6 +257,7 @@ module mod_output
         end if
         if ( associated(atm_w_out) ) then
           if ( idynamic == 3 ) then
+!$acc update device(mo_atm%w, atm_w_out)
             call wstagtox(mo_atm%w,atm_w_out)
           else
             do k = 1 , kz
