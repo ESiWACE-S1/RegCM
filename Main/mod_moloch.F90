@@ -1192,33 +1192,44 @@ module mod_moloch
         real(rkx) :: dta
         real(rkx) , pointer , dimension(:,:,:) :: ptr
 
-!!$acc update device(ux, vx)
+!$acc update device(u, v, ux, vx)
         call uvstagtox(u,v,ux,vx)
 
         ! Compute W (and TKE if required) on zita levels
 
+!$acc update device(w, wx)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
+!$acc update device(tke, tkex)
           call wstagtox(tke,tkex)
         end if
 
+!$acc update device(tetav, dta)
         call wafone(tetav,dta)
+!$acc update device(pai)
         call wafone(pai,dta)
+!$acc update device(ux)
         call wafone(ux,dta)
+!$acc update device(vx)
         call wafone(vx,dta)
+!$acc update device(wx)
         call wafone(wx,dta)
+!$acc update device(qv)
         call wafone(qv,dta)
         if ( ipptls > 0 ) then
+!$acc update device(qx)
           do n = iqfrst , iqlst
             call assignpnt(qx,ptr,n)
             call wafone(ptr,dta)
           end do
         end if
         if ( ibltyp == 2 ) then
+!$acc update device(tkex)
           call wafone(tkex,dta)
         end if
         if ( ichem == 1 ) then
+!$acc update device(trac)
           do n = 1 , ntr
             call assignpnt(trac,ptr,n)
             call wafone(ptr,dta)
@@ -1229,8 +1240,10 @@ module mod_moloch
         call xtouvstag(ux,vx,u,v)
 
         ! Back to half-levels
+!$acc update device(w)
         call xtowstag(wx,w)
         if ( ibltyp == 2 ) then
+!$acc update device(tke)
           call xtowstag(tkex,tke)
         end if
       end subroutine advection
@@ -1941,8 +1954,8 @@ module mod_moloch
     i2 = ubound(wx,2)
     j1 = lbound(wx,1)
     j2 = ubound(wx,1)
-!!$acc parallel present(wx, w)
-!!$acc loop collapse(3)
+!$acc parallel present(wx, w)
+!$acc loop collapse(3)
     do k = 2 , kzm1
       do i = i1 , i2
         do j = j1 , j2
@@ -1951,16 +1964,16 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
-!!$acc parallel present(wx, w)
-!!$acc loop collapse(2)
+!$acc end parallel
+!$acc parallel present(wx, w)
+!$acc loop collapse(2)
     do i = i1 , i2
       do j = j1 , j2
         wx(j,i,1)  = d_half * (w(j,i,2)+w(j,i,1))
         wx(j,i,kz) = d_half * (w(j,i,kzp1)+w(j,i,kz))
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
   end subroutine wstagtox
 
   subroutine xtowstag(wx,w)
@@ -1969,8 +1982,8 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
     integer(ik4) :: i , j , k
 
-!!$acc parallel present(w, wx)
-!!$acc loop collapse(3)
+!$acc parallel present(w, wx)
+!$acc loop collapse(3)
     do k = 3 , kzm1
       do i = ice1 , ice2
         do j = jce1 , jce2
@@ -1979,16 +1992,16 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
-!!$acc parallel present(w, wx)
-!!$acc loop collapse(2)
+!$acc end parallel
+!$acc parallel present(w, wx)
+!$acc loop collapse(2)
     do i = ice1 , ice2
       do j = jce1 , jce2
         w(j,i,2) = d_half * (wx(j,i,2)  +wx(j,i,1))
         w(j,i,kz) = d_half * (wx(j,i,kz)+wx(j,i,kzm1))
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
   end subroutine xtowstag
 
   subroutine xtoustag(ux,u)
@@ -2075,14 +2088,14 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     integer(ik4) :: i , j , k
 
-!!$acc update self(ux, vx)
+!$acc update self(ux, vx)
     call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
     call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
-!!$acc update device(ux, vx)
+!$acc update device(ux, vx)
 
     ! Back to wind points: U (fourth order)
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(3)
+!$acc parallel present(u, ux)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jdii1 , jdii2
@@ -2091,31 +2104,31 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdyright ) then
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdyleft ) then
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
 
     ! Back to wind points: V (fourth order)
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(3)
+!$acc parallel present(v, vx)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = idii1 , idii2
         do j = jci1 , jci2
@@ -2124,26 +2137,26 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdytop ) then
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdybottom ) then
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
   end subroutine xtouvstag
 
@@ -2153,14 +2166,14 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
-!!$acc update self(u, v)
+!$acc update self(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
-!!$acc update device(u, v)
+!$acc update device(u, v)
 
     ! Compute U-wind on T points
-!!$acc parallel present(ux, u)
-!!$acc loop collapse(3)
+!$acc parallel present(ux, u)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ice1 , ice2
         do j = jci1 , jci2
@@ -2169,31 +2182,31 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdyleft ) then
-!!$acc parallel present(ux, u)
-!!$acc loop collapse(2)
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce1,i,k) = d_half * (u(jde1,i,k)+u(jdi1,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdyright ) then
-!!$acc parallel present(ux, u)
-!!$acc loop collapse(2)
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ice1 , ice2
           ux(jce2,i,k) = d_half*(u(jde2,i,k) + u(jdi2,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
 
     ! Compute V-wind on T points
-!!$acc parallel present(vx, v)
-!!$acc loop collapse(3)
+!$acc parallel present(vx, v)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jce1 , jce2
@@ -2202,26 +2215,26 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdybottom ) then
-!!$acc parallel present(vx, v)
-!!$acc loop collapse(2)
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice1,k) = d_half * (v(j,ide1,k)+v(j,idi1,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdytop ) then
-!!$acc parallel present(vx, v)
-!!$acc loop collapse(2)
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jce1 , jce2
           vx(j,ice2,k) = d_half*(v(j,ide2,k) + v(j,idi2,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
   end subroutine uvstagtox
 
