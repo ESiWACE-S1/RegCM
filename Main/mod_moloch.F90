@@ -1285,12 +1285,10 @@ module mod_moloch
         end do
 !$acc end parallel
 
-!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
-!$acc loop gang
         do i = ici1 , ici2
-!$acc loop seq
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
+!$acc loop collapse(2)
           do k = 1 , kzm1
-!$acc loop vector
             do j = jci1 , jci2
               zamu = s(j,i,k+1) * zdtrdz
               if ( zamu >= d_zero ) then
@@ -1313,7 +1311,9 @@ module mod_moloch
               !                              (d_one-zphi)*pp(j,i,k))
             end do
           end do
-!$acc loop vector
+!$acc end parallel
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
+!$acc loop collapse(2)
           do k = 1 , kz
             do j = jci1 , jci2
               zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
@@ -1322,6 +1322,7 @@ module mod_moloch
               wz(j,i,k) = pp(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
             end do
           end do
+!$acc end parallel
           !do k = 1 , kz
           !  do j = jci1 , jci2
           !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
@@ -1329,15 +1330,12 @@ module mod_moloch
           !  end do
           !end do
         end do
-!$acc end parallel
 
         if ( do_vadvtwice ) then
-!$acc parallel present(fmzf, wz, wfw, s, fmz)
-!$acc loop gang
           do i = ici1 , ici2
-!$acc loop seq
+!$acc parallel present(fmzf, wz, wfw, s, fmz)
+!$acc loop collapse(2)
             do k = 1 , kzm1
-!$acc loop vector
               do j = jci1 , jci2
                 zamu = s(j,i,k+1) * zdtrdz
                 if ( zamu >= d_zero ) then
@@ -1360,15 +1358,943 @@ module mod_moloch
                 !                              (d_one-zphi)*wz(j,i,k))
               end do
             end do
-!$acc loop vector
+!$acc end parallel
+!$acc parallel present(fmzf, wz, wfw, s, fmz)
+!$acc loop
             do j = jci1 , jci2
               zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
               zdv = -s(j,i,2) * zrfmd * wz(j,i,1)
               wz(j,i,1) = wz(j,i,1) + wfw(j,2) * zrfmd + zdv
             end do
-!$acc loop seq
+!$acc end parallel
+!$acc parallel present(fmzf, wz, wfw, s, fmz)
+!$acc loop collapse(2)
             do k = 2 , kz
-!$acc loop vector
+              do j = jci1 , jci2
+                zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
+                zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
+                zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * wz(j,i,k)
+                wz(j,i,k) = wz(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
+              end do
+            end do
+!$acc end parallel
+            !do k = 1 , kz
+            !  do j = jci1 , jci2
+            !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
+            !    wz(j,i,k) = pp(j,i,k) - wfw(j,k) + wfw(j,k+1) + zdv
+            !  end do
+            !end do
+          end do
+        end if
+
+        if ( ma%has_bdybottom ) then
+!$acc parallel present(wz)
+          do k = 1 , kz
+            do j = jci1 , jci2
+              wz(j,ice1,k) = wz(j,ici1,k)
+            end do
+          end do
+!$acc end parallel
+        end if
+        if ( ma%has_bdytop ) then
+!$acc parallel present(wz)
+          do k = 1 , kz
+            do j = jci1 , jci2
+              wz(j,ice2,k) = wz(j,ici2,k)
+            end do
+          end do
+!$acc end parallel
+        end if
+
+!$acc update self(wz)
+        call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
+!$acc update device(wz)
+
+        if ( lrotllr ) then
+
+          ! Meridional advection
+
+          do k = 1 , kz
+!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
+!$acc loop collapse(2)
+            do i = ici1 , ice2ga
+              do j = jci1 , jci2
+                zamu = v(j,i,k) * zdtrdy
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  ih = i-1
+                else
+                  is = -d_one
+                  ih = i+1
+                end if
+                ihm1 = max(ih-1,icross1)
+                ih = min(ih,icross2)
+                r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i,k), wz(j,i-1,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpby(j,i) = d_half * v(j,i,k) * &
+                  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+                !zpby(j,i) = d_half * zamu * &
+                !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+              end do
+            end do
+!$acc end parallel
+!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
+                zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
+                zrfmn = zhxvtn * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
+                zrfms = zhxvts * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
+                zdv = (v(j,i+1,k) * zrfmn - v(j,i,k) * zrfms) * pp(j,i,k)
+                p0(j,i,k) = wz(j,i,k) + &
+                      zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv
+              end do
+            end do
+!$acc end parallel
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
+            !    zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
+            !    zdv = (v(j,i+1,k) * zhxvtn - v(j,i,k) * zhxvts) * pp(j,i,k)
+            !    p0(j,i,k) = wz(j,i,k) + zpby(j,i) - zpby(j,i+1) + zdv
+            !  end do
+            !end do
+          end do
+
+          if ( ma%has_bdyleft ) then
+!$acc parallel present(p0)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce1,i,k) = p0(jci1,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+          if ( ma%has_bdyright ) then
+!$acc parallel present(p0)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce2,i,k) = p0(jci2,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+!$acc update self(p0)
+          call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
+
+          ! Zonal advection
+
+          do k = 1 , kz
+!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jce2ga
+                zamu = u(j,i,k) * mu(j,i) * zdtrdx
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  jh = j-1
+                else
+                  is = -d_one
+                  jh = j+1
+                end if
+                jhm1 = max(jh-1,jcross1)
+                jh = min(jh,jcross2)
+                r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j,i,k), p0(j-1,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbw(j,i) = d_half * u(j,i,k) * &
+                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+                !zpbw(j,i) = d_half * zamu * &
+                !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+              end do
+            end do
+!$acc end parallel
+!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                zcostx = zdtrdx * mu(j,i)
+                zrfme = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
+                zrfmw = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
+                zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
+                pp(j,i,k) = p0(j,i,k) + &
+                     zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv
+              end do
+            end do
+!$acc end parallel
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zrfme = mu(j+1,i) * zdtrdx
+            !    zrfmw = mu(j,i) * zdtrdx
+            !    zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
+            !    pp(j,i,k) = p0(j,i,k) + zpbw(j,i) - zpbw(j+1,i) + zdv
+            !  end do
+            !end do
+          end do
+
+        else
+
+          ! Meridional advection
+
+          do k = 1 , kz
+!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
+!$acc loop collapse(2)
+            do i = ici1 , ice2ga
+              do j = jci1 , jci2
+                zamu = v(j,i,k) * rmv(j,i) * zdtrdy
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  ih = i-1
+                else
+                  is = -d_one
+                  ih = min(i+1,icross2)
+                end if
+                ihm1 = max(ih-1,icross1)
+                r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i,k), wz(j,i-1,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpby(j,i) = d_half * v(j,i,k) * rmv(j,i) * &
+                  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+                !zpby(j,i) = d_half * zamu * &
+                !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+              end do
+            end do
+!$acc end parallel
+!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                zrfmn = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
+                zrfms = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
+                zdv = (v(j,i+1,k) * rmv(j,i+1) * zrfmn - &
+                       v(j,i,k)   * rmv(j,i)   * zrfms) * pp(j,i,k)
+                p0(j,i,k) = wz(j,i,k) + &
+                  mx2(j,i) * (zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv)
+              end do
+            end do
+!$acc end parallel
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+                !zdv = (v(j,i+1,k) * rmv(j,i+1) - &
+                !       v(j,i,k)   * rmv(j,i)   ) * zdtrdy * pp(j,i,k)
+                !p0(j,i,k) = wz(j,i,k) + &
+                !  mx2(j,i) * (zpby(j,i) - zpby(j,i+1) + zdv)
+            !  end do
+            !end do
+          end do
+
+          if ( ma%has_bdyleft ) then
+!$acc parallel present(p0)
+!$acc loop collapse(2)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce1,i,k) = p0(jci1,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+          if ( ma%has_bdyright ) then
+!$acc parallel present(p0)
+!$acc loop collapse(2)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce2,i,k) = p0(jci2,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+!$acc update self(p0)
+          call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
+
+          ! Zonal advection
+
+          do k = 1 , kz
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jce2ga
+                zamu = u(j,i,k) * rmu(j,i) * zdtrdx
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  jh = j-1
+                else
+                  is = -d_one
+                  jh = min(j+1,jcross2)
+                end if
+                jhm1 = max(jh-1,jcross1)
+                r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j,i,k), p0(j-1,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbw(j,i) = d_half * u(j,i,k) * rmu(j,i) * &
+                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+                !zpbw(j,i) = d_half * zamu * &
+                !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+              end do
+            end do
+!$acc end parallel
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
+!$acc loop collapse(2)
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                zrfme = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
+                zrfmw = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
+                zdv = (u(j+1,i,k) * rmu(j+1,i) * zrfme - &
+                       u(j,i,k)   * rmu(j,i)   * zrfmw) * pp(j,i,k)
+                pp(j,i,k) = p0(j,i,k) + &
+                  mx2(j,i) * (zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv)
+              end do
+            end do
+!$acc end parallel
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zdv = (u(j+1,i,k) * rmu(j+1,i) - &
+            !           u(j,i,k)   * rmu(j,i)   ) * zdtrdx * pp(j,i,k)
+            !    pp(j,i,k) = p0(j,i,k) + &
+            !      mx2(j,i) * (zpbw(j,i) - zpbw(j+1,i) + zdv)
+            !  end do
+            !end do
+          end do
+        end if
+
+      end subroutine wafone
+
+      subroutine reset_tendencies
+        implicit none
+
+        s(:,:,:) = d_zero
+        deltaw(:,:,:) = d_zero
+        zdiv2(:,:,:) = d_zero
+        mo_atm%tten = d_zero
+        mo_atm%qxten = d_zero
+        mo_atm%uten = d_zero
+        mo_atm%vten = d_zero
+        if ( ichem == 1 ) then
+          mo_atm%chiten = d_zero
+        end if
+        if ( ibltyp == 2 ) then
+          mo_atm%tketen = d_zero
+        end if
+
+        cldfra(:,:,:) = d_zero
+        cldlwc(:,:,:) = d_zero
+
+        if ( idiag > 0 ) then
+          ten0 = t(jci1:jci2,ici1:ici2,:)
+          qen0 = qv(jci1:jci2,ici1:ici2,:)
+          if ( ichem == 1 ) then
+            chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+          end if
+        end if
+      end subroutine reset_tendencies
+
+      subroutine physical_parametrizations
+        implicit none
+        integer(ik4) :: i , j , k , n
+        logical :: loutrad , labsem
+
+#ifdef DEBUG
+        do k = 1 , kz
+          do i = ice1 , ice2
+            do j = jce1 , jce2
+              if ( (t(j,i,k) > 350.0_rkx) .or. t(j,i,k) < 170.0_rkx ) then
+                write(100+myid,*) 'Before Phys On : ', myid
+                write(100+myid,*) 'At : ', i,j,k
+                write(100+myid,*) 'k pai u v w qv qc t tetav'
+                do n = 1 , kz
+                  write(100+myid,*) n, pai(j,i,n), u(j,i,n), v(j,i,n), &
+                            w(j,i,n) , qv(j,i,n) , qc(j,i,n) , &
+                            t(j,i,n) , tetav(j,i,n)
+                end do
+                flush(100+myid)
+                call fatal(__FILE__,__LINE__, 'error')
+              end if
+            end do
+          end do
+        end do
+#endif
+        if ( any(icup > 0) ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+          end if
+          call cumulus
+          if ( ichem == 1 ) then
+            if ( ichcumtra == 1 ) then
+              if ( debug_level > 3 .and. myid == italk ) then
+                write(stdout,*) 'Calling cumulus transport at ', &
+                           trim(rcmtimer%str())
+              end if
+              call cumtran(trac)
+            end if
+          end if
+          if ( idiag > 0 ) then
+            tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            cconvdiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+          end if
+        else
+          if ( any(icup < 0) ) then
+            call shallow_convection
+            if ( idiag > 0 ) then
+              tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+              qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+            end if
+          end if
+        end if
+        !
+        !------------------------------------------------
+        ! Large scale precipitation microphysical schemes
+        !------------------------------------------------
+        !
+        if ( ipptls > 0 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          ! Cumulus clouds
+          if ( icldfrac /= 2 ) then
+            call cucloud
+          end if
+          ! Save cumulus cloud fraction for chemistry before it is
+          ! overwritten in cldfrac
+          if ( ichem == 1 ) then
+            convcldfra(:,:,:) = cldfra(:,:,:)
+          end if
+          ! Clouds and large scale precipitation
+          call cldfrac(cldlwc,cldfra)
+          call microscheme
+          if ( idiag > 0 ) then
+            tdiag%lsc = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%lsc = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+        end if
+        !
+        !------------------------------------------------
+        !       Call radiative transfer package
+        !------------------------------------------------
+        !
+        if ( rcmtimer%start() .or. syncro_rad%will_act( ) ) then
+          if ( debug_level > 3 .and. myid == italk ) then
+            write(stdout,*) &
+              'Calling radiative transfer at ',trim(rcmtimer%str())
+          end if
+          ! calculate albedo
+          call surface_albedo
+          ! Update / init Ozone profiles
+          if ( iclimao3 == 1 ) then
+            call updateo3(rcmtimer%idate,scenario)
+          else
+            if ( rcmtimer%start() ) call inito3
+          end if
+          if ( iclimaaer == 1 ) then
+            call updateaerosol(rcmtimer%idate)
+          else if ( iclimaaer == 2 ) then
+            call updateaeropp(rcmtimer%idate)
+          else if ( iclimaaer == 3 ) then
+            call updateaeropp_cmip6(rcmtimer%idate)
+          end if
+          loutrad = ( rcmtimer%start() .or. alarm_out_rad%will_act(dtrad) )
+          labsem = ( rcmtimer%start() .or. syncro_emi%will_act() )
+          if ( debug_level > 3 .and. myid == italk ) then
+            if ( labsem ) then
+              write(stdout,*) 'Updating abs-emi at ',trim(rcmtimer%str())
+            end if
+            if ( loutrad ) then
+              write(stdout,*) 'Collecting radiation at ',trim(rcmtimer%str())
+            end if
+          end if
+          call radiation(rcmtimer%year,rcmtimer%month,loutrad,labsem)
+        end if
+        !
+        ! Add radiative transfer package-calculated heating rates to
+        ! temperature tendency (deg/sec)
+        !
+        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+          mo_atm%tten(j,i,k) = mo_atm%tten(j,i,k) + heatrt(j,i,k)
+        end do
+        if ( idiag > 0 ) tdiag%rad = heatrt
+        !
+        !------------------------------------------------
+        !            Call Surface model
+        !------------------------------------------------
+        !
+        if ( rcmtimer%start() .or. syncro_srf%will_act( ) ) then
+          if ( debug_level > 3 .and. myid == italk ) then
+            write(stdout,*) 'Calling surface model at ',trim(rcmtimer%str())
+          end if
+          call surface_model
+          if ( islab_ocean == 1 ) call update_slabocean(xslabtime)
+        end if
+        !
+        !------------------------------------------------
+        !             Call PBL scheme
+        !------------------------------------------------
+        !
+        if ( ibltyp > 0 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+          end if
+          call pblscheme
+          if ( idiag > 0 ) then
+            tdiag%tbl = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%tbl = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            ctbldiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+          end if
+        end if
+        if ( ipptls == 1 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          call condtq
+          if ( idiag > 0 ) then
+            tdiag%lsc = tdiag%lsc + mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%lsc = qdiag%lsc + &
+                 mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+        end if
+        if ( ichem == 1 ) then
+          call tractend2(rcmtimer%month,rcmtimer%day,declin)
+        end if
+        !
+        ! Update status
+        !
+        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+          t(j,i,k) = t(j,i,k) + dtsec * mo_atm%tten(j,i,k)
+        end do
+        do concurrent ( j = jdi1:jdi2 , i = ici1:ici2 , k = 1:kz )
+          u(j,i,k) = u(j,i,k) + dtsec * mo_atm%uten(j,i,k)
+        end do
+        do concurrent ( j = jci1:jci2 , i = idi1:idi2 , k = 1:kz )
+          v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
+        end do
+        do k = 1 , kz
+          do i = ici1 , ici2
+            do j = jci1 , jci2
+              qx(j,i,k,iqv) = qx(j,i,k,iqv) + mo_atm%qxten(j,i,k,iqv)*dtsec
+              qx(j,i,k,iqv) = max(qx(j,i,k,iqv),minqq)
+            end do
+          end do
+        end do
+        do n = iqfrst , iqlst
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                qx(j,i,k,n) = qx(j,i,k,n) + mo_atm%qxten(j,i,k,n)*dtsec
+                qx(j,i,k,n) = max(qx(j,i,k,n),d_zero)
+              end do
+            end do
+          end do
+        end do
+        if ( ibltyp == 2 ) then
+          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kzp1 )
+            tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
+          end do
+        end if
+        if ( ichem == 1 ) then
+          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz , n = 1:ntr )
+            trac(j,i,k,n) = trac(j,i,k,n) + dtsec * mo_atm%chiten(j,i,k,n)
+            trac(j,i,k,n) = max(trac(j,i,k,n),d_zero)
+          end do
+        end if
+#ifdef DEBUG
+        do k = 1 , kz
+          do i = ice1 , ice2
+            do j = jce1 , jce2
+              if ( (t(j,i,k) > 350.0_rkx) .or. t(j,i,k) < 170.0_rkx ) then
+                write(100+myid,*) 'On : ', myid
+                write(100+myid,*) 'After Phys At : ', i,j,k
+                write(100+myid,*) 'k pai u v w qv qc t tetav'
+                do n = 1 , kz
+                  write(100+myid,*) n, pai(j,i,n), u(j,i,n), v(j,i,n), &
+                            w(j,i,n) , qv(j,i,n) , qc(j,i,n) , &
+                            t(j,i,n) , tetav(j,i,n)
+                end do
+                flush(100+myid)
+                call fatal(__FILE__,__LINE__, 'error')
+              end if
+            end do
+          end do
+        end do
+#endif
+      end subroutine physical_parametrizations
+
+  end subroutine moloch
+
+  subroutine wstagtox(w,wx)
+    implicit none
+    real(rkx) , intent(in) , dimension(:,:,:) , pointer :: w
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
+    integer(ik4) :: i , j , k , i1 , i2 , j1 , j2
+
+    i1 = lbound(wx,2)
+    i2 = ubound(wx,2)
+    j1 = lbound(wx,1)
+    j2 = ubound(wx,1)
+!$acc parallel present(wx, w)
+!$acc loop collapse(3)
+    do k = 2 , kzm1
+      do i = i1 , i2
+        do j = j1 , j2
+          wx(j,i,k) = 0.5625_rkx * (w(j,i,k+1)+w(j,i,k)) - &
+                      0.0625_rkx * (w(j,i,k+2)+w(j,i,k-1))
+        end do
+      end do
+    end do
+!$acc end parallel
+!$acc parallel present(wx, w)
+!$acc loop collapse(2)
+    do i = i1 , i2
+      do j = j1 , j2
+        wx(j,i,1)  = d_half * (w(j,i,2)+w(j,i,1))
+        wx(j,i,kz) = d_half * (w(j,i,kzp1)+w(j,i,kz))
+      end do
+    end do
+!$acc end parallel
+  end subroutine wstagtox
+
+  subroutine xtowstag(wx,w)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
+    integer(ik4) :: i , j , k
+
+!$acc parallel present(w, wx)
+!$acc loop collapse(3)
+    do k = 3 , kzm1
+      do i = ice1 , ice2
+        do j = jce1 , jce2
+          w(j,i,k) = 0.5625_rkx * (wx(j,i,k)  +wx(j,i,k-1)) - &
+                     0.0625_rkx * (wx(j,i,k+1)+wx(j,i,k-2))
+        end do
+      end do
+    end do
+!$acc end parallel
+!$acc parallel present(w, wx)
+!$acc loop collapse(2)
+    do i = ice1 , ice2
+      do j = jce1 , jce2
+        w(j,i,2) = d_half * (wx(j,i,2)  +wx(j,i,1))
+        w(j,i,kz) = d_half * (wx(j,i,kz)+wx(j,i,kzm1))
+      end do
+    end do
+!$acc end parallel
+  end subroutine xtowstag
+
+  subroutine xtoustag(ux,u)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u
+    integer(ik4) :: i , j , k
+
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jdii1 , jdii2
+          u(j,i,k) = 0.5625_rkx * (ux(j,i,k)  +ux(j-1,i,k)) - &
+                     0.0625_rkx * (ux(j+1,i,k)+ux(j-2,i,k))
+        end do
+      end do
+    end do
+!!$acc end parallel
+    if ( ma%has_bdyright ) then
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+    if ( ma%has_bdyleft ) then
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine xtoustag
+
+  subroutine xtovstag(vx,v)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: vx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: v
+    integer(ik4) :: i , j , k
+
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = idii1 , idii2
+        do j = jci1 , jci2
+          v(j,i,k) = 0.5625_rkx * (vx(j,i,k)  +vx(j,i-1,k)) - &
+                     0.0625_rkx * (vx(j,i+1,k)+vx(j,i-2,k))
+        end do
+      end do
+    end do
+!!$acc end parallel
+    if ( ma%has_bdytop ) then
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+    if ( ma%has_bdybottom ) then
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine xtovstag
+
+  subroutine xtouvstag(ux,vx,u,v)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
+    integer(ik4) :: i , j , k
+
+!$acc update self(ux, vx)
+    call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
+    call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(ux, vx)
+
+    ! Back to wind points: U (fourth order)
+!$acc parallel present(u, ux)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jdii1 , jdii2
+          u(j,i,k) = 0.5625_rkx * (ux(j,i,k)  +ux(j-1,i,k)) - &
+                     0.0625_rkx * (ux(j+1,i,k)+ux(j-2,i,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdyright ) then
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdyleft ) then
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+
+    ! Back to wind points: V (fourth order)
+!$acc parallel present(v, vx)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = idii1 , idii2
+        do j = jci1 , jci2
+          v(j,i,k) = 0.5625_rkx * (vx(j,i,k)  +vx(j,i-1,k)) - &
+                     0.0625_rkx * (vx(j,i+1,k)+vx(j,i-2,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdytop ) then
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdybottom ) then
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+  end subroutine xtouvstag
+
+  subroutine uvstagtox(u,v,ux,vx)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
+    integer(ik4) :: i , j , k
+
+!$acc update self(u, v)
+    call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
+    call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
+!$acc update device(u, v)
+
+    ! Compute U-wind on T points
+!$acc parallel present(ux, u)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ice1 , ice2
+        do j = jci1 , jci2
+          ux(j,i,k) = 0.5625_rkx * (u(j+1,i,k)+u(j,i,k)) - &
+                      0.0625_rkx * (u(j+2,i,k)+u(j-1,i,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdyleft ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ice1 , ice2
+          ux(jce1,i,k) = d_half * (u(jde1,i,k)+u(jdi1,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdyright ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ice1 , ice2
+          ux(jce2,i,k) = d_half*(u(jde2,i,k) + u(jdi2,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+
+    ! Compute V-wind on T points
+!$acc parallel present(vx, v)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jce1 , jce2
+          vx(j,i,k) = 0.5625_rkx * (v(j,i+1,k)+v(j,i,k)) - &
+                      0.0625_rkx * (v(j,i+2,k)+v(j,i-1,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdybottom ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jce1 , jce2
+          vx(j,ice1,k) = d_half * (v(j,ide1,k)+v(j,idi1,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdytop ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jce1 , jce2
+          vx(j,ice2,k) = d_half*(v(j,ide2,k) + v(j,idi2,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+  end subroutine uvstagtox
+
+  subroutine divdamp(dts)
+    implicit none
+    real(rkx) , intent(in) :: dts
+    integer(ik4) :: i , j , k
+    real(rkx) :: ddamp1
+
+    ddamp1 = ddamp*0.125_rkx*dx**2/dts
+    if ( lrotllr ) then
+!!$acc parallel present(u, rmu, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          do j = jdi1 , jdi2
+            u(j,i,k) = u(j,i,k) + &
+                ddamp1/(dx*rmu(j,i))*(zdiv2(j,i,k)-zdiv2(j-1,i,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+!!$acc parallel present(v, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = idi1 , idi2
+          do j = jci1 , jci2
+            v(j,i,k) = v(j,i,k) + &
+                ddamp1/dx*(zdiv2(j,i,k)-zdiv2(j,i-1,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+    else
+!!$acc parallel present(u, rmu, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          do j = jdi1 , jdi2
+            u(j,i,k) = u(j,i,k) + &
+                ddamp1/(dx*rmu(j,i))*(zdiv2(j,i,k)-zdiv2(j-1,i,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+!!$acc parallel present(v, rmv, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = idi1 , idi2
+          do j = jci1 , jci2
+            v(j,i,k) = v(j,i,k) + &
+                ddamp1/(dx*rmv(j,i))*(zdiv2(j,i,k)-zdiv2(j,i-1,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine divdamp
+
+end module mod_moloch
+
+! vim: tabstop=8 expandtab shiftwidth=2 softtabstop=2
+!$acc loop collapse(2)
+            do k = 2 , kz
               do j = jci1 , jci2
                 zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
                 zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
@@ -1382,8 +2308,938 @@ module mod_moloch
             !    wz(j,i,k) = pp(j,i,k) - wfw(j,k) + wfw(j,k+1) + zdv
             !  end do
             !end do
+!$acc end parallel
+          end do
+        end if
+
+        if ( ma%has_bdybottom ) then
+!$acc parallel present(wz)
+          do k = 1 , kz
+            do j = jci1 , jci2
+              wz(j,ice1,k) = wz(j,ici1,k)
+            end do
           end do
 !$acc end parallel
+        end if
+        if ( ma%has_bdytop ) then
+!$acc parallel present(wz)
+          do k = 1 , kz
+            do j = jci1 , jci2
+              wz(j,ice2,k) = wz(j,ici2,k)
+            end do
+          end do
+!$acc end parallel
+        end if
+
+!$acc update self(wz)
+        call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
+!$acc update device(wz)
+
+        if ( lrotllr ) then
+
+          ! Meridional advection
+
+!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
+!$acc loop gang
+          do k = 1 , kz
+!$acc loop seq
+            do i = ici1 , ice2ga
+!$acc loop vector
+              do j = jci1 , jci2
+                zamu = v(j,i,k) * zdtrdy
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  ih = i-1
+                else
+                  is = -d_one
+                  ih = i+1
+                end if
+                ihm1 = max(ih-1,icross1)
+                ih = min(ih,icross2)
+                r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i,k), wz(j,i-1,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpby(j,i) = d_half * v(j,i,k) * &
+                  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+                !zpby(j,i) = d_half * zamu * &
+                !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+              end do
+            end do
+!$acc loop seq
+            do i = ici1 , ici2
+!$acc loop vector
+              do j = jci1 , jci2
+                zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
+                zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
+                zrfmn = zhxvtn * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
+                zrfms = zhxvts * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
+                zdv = (v(j,i+1,k) * zrfmn - v(j,i,k) * zrfms) * pp(j,i,k)
+                p0(j,i,k) = wz(j,i,k) + &
+                      zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv
+              end do
+            end do
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
+            !    zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
+            !    zdv = (v(j,i+1,k) * zhxvtn - v(j,i,k) * zhxvts) * pp(j,i,k)
+            !    p0(j,i,k) = wz(j,i,k) + zpby(j,i) - zpby(j,i+1) + zdv
+            !  end do
+            !end do
+          end do
+!$acc end parallel
+
+          if ( ma%has_bdyleft ) then
+!$acc parallel present(p0)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce1,i,k) = p0(jci1,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+          if ( ma%has_bdyright ) then
+!$acc parallel present(p0)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce2,i,k) = p0(jci2,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+!$acc update self(p0)
+          call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
+
+          ! Zonal advection
+
+!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
+!$acc loop gang
+          do k = 1 , kz
+!$acc loop vector
+            do i = ici1 , ici2
+!$acc loop seq
+              do j = jci1 , jce2ga
+                zamu = u(j,i,k) * mu(j,i) * zdtrdx
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  jh = j-1
+                else
+                  is = -d_one
+                  jh = j+1
+                end if
+                jhm1 = max(jh-1,jcross1)
+                jh = min(jh,jcross2)
+                r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j,i,k), p0(j-1,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbw(j,i) = d_half * u(j,i,k) * &
+                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+                !zpbw(j,i) = d_half * zamu * &
+                !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+              end do
+            end do
+!$acc loop vector
+            do i = ici1 , ici2
+!$acc loop seq
+              do j = jci1 , jci2
+                zcostx = zdtrdx * mu(j,i)
+                zrfme = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
+                zrfmw = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
+                zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
+                pp(j,i,k) = p0(j,i,k) + &
+                     zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv
+              end do
+            end do
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zrfme = mu(j+1,i) * zdtrdx
+            !    zrfmw = mu(j,i) * zdtrdx
+            !    zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
+            !    pp(j,i,k) = p0(j,i,k) + zpbw(j,i) - zpbw(j+1,i) + zdv
+            !  end do
+            !end do
+          end do
+!$acc end parallel
+
+        else
+
+          ! Meridional advection
+
+!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
+!$acc loop gang
+          do k = 1 , kz
+!$acc loop seq
+            do i = ici1 , ice2ga
+!$acc loop vector
+              do j = jci1 , jci2
+                zamu = v(j,i,k) * rmv(j,i) * zdtrdy
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  ih = i-1
+                else
+                  is = -d_one
+                  ih = min(i+1,icross2)
+                end if
+                ihm1 = max(ih-1,icross1)
+                r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i,k), wz(j,i-1,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpby(j,i) = d_half * v(j,i,k) * rmv(j,i) * &
+                  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+                !zpby(j,i) = d_half * zamu * &
+                !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+              end do
+            end do
+!$acc loop seq
+            do i = ici1 , ici2
+!$acc loop vector
+              do j = jci1 , jci2
+                zrfmn = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
+                zrfms = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
+                zdv = (v(j,i+1,k) * rmv(j,i+1) * zrfmn - &
+                       v(j,i,k)   * rmv(j,i)   * zrfms) * pp(j,i,k)
+                p0(j,i,k) = wz(j,i,k) + &
+                  mx2(j,i) * (zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv)
+              end do
+            end do
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+                !zdv = (v(j,i+1,k) * rmv(j,i+1) - &
+                !       v(j,i,k)   * rmv(j,i)   ) * zdtrdy * pp(j,i,k)
+                !p0(j,i,k) = wz(j,i,k) + &
+                !  mx2(j,i) * (zpby(j,i) - zpby(j,i+1) + zdv)
+            !  end do
+            !end do
+          end do
+!$acc end parallel
+
+          if ( ma%has_bdyleft ) then
+!$acc parallel present(p0)
+!$acc loop collapse(2)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce1,i,k) = p0(jci1,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+          if ( ma%has_bdyright ) then
+!$acc parallel present(p0)
+!$acc loop collapse(2)
+            do k = 1 , kz
+              do i = ici1 , ici2
+                p0(jce2,i,k) = p0(jci2,i,k)
+              end do
+            end do
+!$acc end parallel
+          end if
+
+!$acc update self(p0)
+          call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
+!$acc update device(p0)
+
+          ! Zonal advection
+
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
+!$acc loop gang
+          do k = 1 , kz
+!$acc loop vector
+            do i = ici1 , ici2
+!$acc loop seq
+              do j = jci1 , jce2ga
+                zamu = u(j,i,k) * rmu(j,i) * zdtrdx
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  jh = j-1
+                else
+                  is = -d_one
+                  jh = min(j+1,jcross2)
+                end if
+                jhm1 = max(jh-1,jcross1)
+                r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j,i,k), p0(j-1,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbw(j,i) = d_half * u(j,i,k) * rmu(j,i) * &
+                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+                !zpbw(j,i) = d_half * zamu * &
+                !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+              end do
+            end do
+
+!$acc loop vector
+            do i = ici1 , ici2
+!$acc loop seq
+              do j = jci1 , jci2
+                zrfme = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
+                zrfmw = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
+                zdv = (u(j+1,i,k) * rmu(j+1,i) * zrfme - &
+                       u(j,i,k)   * rmu(j,i)   * zrfmw) * pp(j,i,k)
+                pp(j,i,k) = p0(j,i,k) + &
+                  mx2(j,i) * (zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv)
+              end do
+            end do
+            !do i = ici1 , ici2
+            !  do j = jci1 , jci2
+            !    zdv = (u(j+1,i,k) * rmu(j+1,i) - &
+            !           u(j,i,k)   * rmu(j,i)   ) * zdtrdx * pp(j,i,k)
+            !    pp(j,i,k) = p0(j,i,k) + &
+            !      mx2(j,i) * (zpbw(j,i) - zpbw(j+1,i) + zdv)
+            !  end do
+            !end do
+          end do
+!$acc end parallel
+        end if
+
+      end subroutine wafone
+
+      subroutine reset_tendencies
+        implicit none
+
+        s(:,:,:) = d_zero
+        deltaw(:,:,:) = d_zero
+        zdiv2(:,:,:) = d_zero
+        mo_atm%tten = d_zero
+        mo_atm%qxten = d_zero
+        mo_atm%uten = d_zero
+        mo_atm%vten = d_zero
+        if ( ichem == 1 ) then
+          mo_atm%chiten = d_zero
+        end if
+        if ( ibltyp == 2 ) then
+          mo_atm%tketen = d_zero
+        end if
+
+        cldfra(:,:,:) = d_zero
+        cldlwc(:,:,:) = d_zero
+
+        if ( idiag > 0 ) then
+          ten0 = t(jci1:jci2,ici1:ici2,:)
+          qen0 = qv(jci1:jci2,ici1:ici2,:)
+          if ( ichem == 1 ) then
+            chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+          end if
+        end if
+      end subroutine reset_tendencies
+
+      subroutine physical_parametrizations
+        implicit none
+        integer(ik4) :: i , j , k , n
+        logical :: loutrad , labsem
+
+#ifdef DEBUG
+        do k = 1 , kz
+          do i = ice1 , ice2
+            do j = jce1 , jce2
+              if ( (t(j,i,k) > 350.0_rkx) .or. t(j,i,k) < 170.0_rkx ) then
+                write(100+myid,*) 'Before Phys On : ', myid
+                write(100+myid,*) 'At : ', i,j,k
+                write(100+myid,*) 'k pai u v w qv qc t tetav'
+                do n = 1 , kz
+                  write(100+myid,*) n, pai(j,i,n), u(j,i,n), v(j,i,n), &
+                            w(j,i,n) , qv(j,i,n) , qc(j,i,n) , &
+                            t(j,i,n) , tetav(j,i,n)
+                end do
+                flush(100+myid)
+                call fatal(__FILE__,__LINE__, 'error')
+              end if
+            end do
+          end do
+        end do
+#endif
+        if ( any(icup > 0) ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+          end if
+          call cumulus
+          if ( ichem == 1 ) then
+            if ( ichcumtra == 1 ) then
+              if ( debug_level > 3 .and. myid == italk ) then
+                write(stdout,*) 'Calling cumulus transport at ', &
+                           trim(rcmtimer%str())
+              end if
+              call cumtran(trac)
+            end if
+          end if
+          if ( idiag > 0 ) then
+            tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            cconvdiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+          end if
+        else
+          if ( any(icup < 0) ) then
+            call shallow_convection
+            if ( idiag > 0 ) then
+              tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+              qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+            end if
+          end if
+        end if
+        !
+        !------------------------------------------------
+        ! Large scale precipitation microphysical schemes
+        !------------------------------------------------
+        !
+        if ( ipptls > 0 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          ! Cumulus clouds
+          if ( icldfrac /= 2 ) then
+            call cucloud
+          end if
+          ! Save cumulus cloud fraction for chemistry before it is
+          ! overwritten in cldfrac
+          if ( ichem == 1 ) then
+            convcldfra(:,:,:) = cldfra(:,:,:)
+          end if
+          ! Clouds and large scale precipitation
+          call cldfrac(cldlwc,cldfra)
+          call microscheme
+          if ( idiag > 0 ) then
+            tdiag%lsc = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%lsc = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+        end if
+        !
+        !------------------------------------------------
+        !       Call radiative transfer package
+        !------------------------------------------------
+        !
+        if ( rcmtimer%start() .or. syncro_rad%will_act( ) ) then
+          if ( debug_level > 3 .and. myid == italk ) then
+            write(stdout,*) &
+              'Calling radiative transfer at ',trim(rcmtimer%str())
+          end if
+          ! calculate albedo
+          call surface_albedo
+          ! Update / init Ozone profiles
+          if ( iclimao3 == 1 ) then
+            call updateo3(rcmtimer%idate,scenario)
+          else
+            if ( rcmtimer%start() ) call inito3
+          end if
+          if ( iclimaaer == 1 ) then
+            call updateaerosol(rcmtimer%idate)
+          else if ( iclimaaer == 2 ) then
+            call updateaeropp(rcmtimer%idate)
+          else if ( iclimaaer == 3 ) then
+            call updateaeropp_cmip6(rcmtimer%idate)
+          end if
+          loutrad = ( rcmtimer%start() .or. alarm_out_rad%will_act(dtrad) )
+          labsem = ( rcmtimer%start() .or. syncro_emi%will_act() )
+          if ( debug_level > 3 .and. myid == italk ) then
+            if ( labsem ) then
+              write(stdout,*) 'Updating abs-emi at ',trim(rcmtimer%str())
+            end if
+            if ( loutrad ) then
+              write(stdout,*) 'Collecting radiation at ',trim(rcmtimer%str())
+            end if
+          end if
+          call radiation(rcmtimer%year,rcmtimer%month,loutrad,labsem)
+        end if
+        !
+        ! Add radiative transfer package-calculated heating rates to
+        ! temperature tendency (deg/sec)
+        !
+        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+          mo_atm%tten(j,i,k) = mo_atm%tten(j,i,k) + heatrt(j,i,k)
+        end do
+        if ( idiag > 0 ) tdiag%rad = heatrt
+        !
+        !------------------------------------------------
+        !            Call Surface model
+        !------------------------------------------------
+        !
+        if ( rcmtimer%start() .or. syncro_srf%will_act( ) ) then
+          if ( debug_level > 3 .and. myid == italk ) then
+            write(stdout,*) 'Calling surface model at ',trim(rcmtimer%str())
+          end if
+          call surface_model
+          if ( islab_ocean == 1 ) call update_slabocean(xslabtime)
+        end if
+        !
+        !------------------------------------------------
+        !             Call PBL scheme
+        !------------------------------------------------
+        !
+        if ( ibltyp > 0 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+          end if
+          call pblscheme
+          if ( idiag > 0 ) then
+            tdiag%tbl = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%tbl = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+          if ( ichem == 1 .and. ichdiag > 0 ) then
+            ctbldiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+          end if
+        end if
+        if ( ipptls == 1 ) then
+          if ( idiag > 0 ) then
+            ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
+            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+          end if
+          call condtq
+          if ( idiag > 0 ) then
+            tdiag%lsc = tdiag%lsc + mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
+            qdiag%lsc = qdiag%lsc + &
+                 mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+          end if
+        end if
+        if ( ichem == 1 ) then
+          call tractend2(rcmtimer%month,rcmtimer%day,declin)
+        end if
+        !
+        ! Update status
+        !
+        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+          t(j,i,k) = t(j,i,k) + dtsec * mo_atm%tten(j,i,k)
+        end do
+        do concurrent ( j = jdi1:jdi2 , i = ici1:ici2 , k = 1:kz )
+          u(j,i,k) = u(j,i,k) + dtsec * mo_atm%uten(j,i,k)
+        end do
+        do concurrent ( j = jci1:jci2 , i = idi1:idi2 , k = 1:kz )
+          v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
+        end do
+        do k = 1 , kz
+          do i = ici1 , ici2
+            do j = jci1 , jci2
+              qx(j,i,k,iqv) = qx(j,i,k,iqv) + mo_atm%qxten(j,i,k,iqv)*dtsec
+              qx(j,i,k,iqv) = max(qx(j,i,k,iqv),minqq)
+            end do
+          end do
+        end do
+        do n = iqfrst , iqlst
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                qx(j,i,k,n) = qx(j,i,k,n) + mo_atm%qxten(j,i,k,n)*dtsec
+                qx(j,i,k,n) = max(qx(j,i,k,n),d_zero)
+              end do
+            end do
+          end do
+        end do
+        if ( ibltyp == 2 ) then
+          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kzp1 )
+            tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
+          end do
+        end if
+        if ( ichem == 1 ) then
+          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz , n = 1:ntr )
+            trac(j,i,k,n) = trac(j,i,k,n) + dtsec * mo_atm%chiten(j,i,k,n)
+            trac(j,i,k,n) = max(trac(j,i,k,n),d_zero)
+          end do
+        end if
+#ifdef DEBUG
+        do k = 1 , kz
+          do i = ice1 , ice2
+            do j = jce1 , jce2
+              if ( (t(j,i,k) > 350.0_rkx) .or. t(j,i,k) < 170.0_rkx ) then
+                write(100+myid,*) 'On : ', myid
+                write(100+myid,*) 'After Phys At : ', i,j,k
+                write(100+myid,*) 'k pai u v w qv qc t tetav'
+                do n = 1 , kz
+                  write(100+myid,*) n, pai(j,i,n), u(j,i,n), v(j,i,n), &
+                            w(j,i,n) , qv(j,i,n) , qc(j,i,n) , &
+                            t(j,i,n) , tetav(j,i,n)
+                end do
+                flush(100+myid)
+                call fatal(__FILE__,__LINE__, 'error')
+              end if
+            end do
+          end do
+        end do
+#endif
+      end subroutine physical_parametrizations
+
+  end subroutine moloch
+
+  subroutine wstagtox(w,wx)
+    implicit none
+    real(rkx) , intent(in) , dimension(:,:,:) , pointer :: w
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
+    integer(ik4) :: i , j , k , i1 , i2 , j1 , j2
+
+    i1 = lbound(wx,2)
+    i2 = ubound(wx,2)
+    j1 = lbound(wx,1)
+    j2 = ubound(wx,1)
+!$acc parallel present(wx, w)
+!$acc loop collapse(3)
+    do k = 2 , kzm1
+      do i = i1 , i2
+        do j = j1 , j2
+          wx(j,i,k) = 0.5625_rkx * (w(j,i,k+1)+w(j,i,k)) - &
+                      0.0625_rkx * (w(j,i,k+2)+w(j,i,k-1))
+        end do
+      end do
+    end do
+!$acc end parallel
+!$acc parallel present(wx, w)
+!$acc loop collapse(2)
+    do i = i1 , i2
+      do j = j1 , j2
+        wx(j,i,1)  = d_half * (w(j,i,2)+w(j,i,1))
+        wx(j,i,kz) = d_half * (w(j,i,kzp1)+w(j,i,kz))
+      end do
+    end do
+!$acc end parallel
+  end subroutine wstagtox
+
+  subroutine xtowstag(wx,w)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
+    integer(ik4) :: i , j , k
+
+!$acc parallel present(w, wx)
+!$acc loop collapse(3)
+    do k = 3 , kzm1
+      do i = ice1 , ice2
+        do j = jce1 , jce2
+          w(j,i,k) = 0.5625_rkx * (wx(j,i,k)  +wx(j,i,k-1)) - &
+                     0.0625_rkx * (wx(j,i,k+1)+wx(j,i,k-2))
+        end do
+      end do
+    end do
+!$acc end parallel
+!$acc parallel present(w, wx)
+!$acc loop collapse(2)
+    do i = ice1 , ice2
+      do j = jce1 , jce2
+        w(j,i,2) = d_half * (wx(j,i,2)  +wx(j,i,1))
+        w(j,i,kz) = d_half * (wx(j,i,kz)+wx(j,i,kzm1))
+      end do
+    end do
+!$acc end parallel
+  end subroutine xtowstag
+
+  subroutine xtoustag(ux,u)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u
+    integer(ik4) :: i , j , k
+
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jdii1 , jdii2
+          u(j,i,k) = 0.5625_rkx * (ux(j,i,k)  +ux(j-1,i,k)) - &
+                     0.0625_rkx * (ux(j+1,i,k)+ux(j-2,i,k))
+        end do
+      end do
+    end do
+!!$acc end parallel
+    if ( ma%has_bdyright ) then
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+    if ( ma%has_bdyleft ) then
+!!$acc parallel present(u, ux)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine xtoustag
+
+  subroutine xtovstag(vx,v)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: vx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: v
+    integer(ik4) :: i , j , k
+
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = idii1 , idii2
+        do j = jci1 , jci2
+          v(j,i,k) = 0.5625_rkx * (vx(j,i,k)  +vx(j,i-1,k)) - &
+                     0.0625_rkx * (vx(j,i+1,k)+vx(j,i-2,k))
+        end do
+      end do
+    end do
+!!$acc end parallel
+    if ( ma%has_bdytop ) then
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+    if ( ma%has_bdybottom ) then
+!!$acc parallel present(v, vx)
+!!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine xtovstag
+
+  subroutine xtouvstag(ux,vx,u,v)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
+    integer(ik4) :: i , j , k
+
+!$acc update self(ux, vx)
+    call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
+    call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
+!$acc update device(ux, vx)
+
+    ! Back to wind points: U (fourth order)
+!$acc parallel present(u, ux)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jdii1 , jdii2
+          u(j,i,k) = 0.5625_rkx * (ux(j,i,k)  +ux(j-1,i,k)) - &
+                     0.0625_rkx * (ux(j+1,i,k)+ux(j-2,i,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdyright ) then
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdyleft ) then
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+
+    ! Back to wind points: V (fourth order)
+!$acc parallel present(v, vx)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = idii1 , idii2
+        do j = jci1 , jci2
+          v(j,i,k) = 0.5625_rkx * (vx(j,i,k)  +vx(j,i-1,k)) - &
+                     0.0625_rkx * (vx(j,i+1,k)+vx(j,i-2,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdytop ) then
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdybottom ) then
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jci1 , jci2
+          v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+  end subroutine xtouvstag
+
+  subroutine uvstagtox(u,v,ux,vx)
+    implicit none
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
+    real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
+    integer(ik4) :: i , j , k
+
+!$acc update self(u, v)
+    call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
+    call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
+!$acc update device(u, v)
+
+    ! Compute U-wind on T points
+!$acc parallel present(ux, u)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ice1 , ice2
+        do j = jci1 , jci2
+          ux(j,i,k) = 0.5625_rkx * (u(j+1,i,k)+u(j,i,k)) - &
+                      0.0625_rkx * (u(j+2,i,k)+u(j-1,i,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdyleft ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ice1 , ice2
+          ux(jce1,i,k) = d_half * (u(jde1,i,k)+u(jdi1,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdyright ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do i = ice1 , ice2
+          ux(jce2,i,k) = d_half*(u(jde2,i,k) + u(jdi2,i,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+
+    ! Compute V-wind on T points
+!$acc parallel present(vx, v)
+!$acc loop collapse(3)
+    do k = 1 , kz
+      do i = ici1 , ici2
+        do j = jce1 , jce2
+          vx(j,i,k) = 0.5625_rkx * (v(j,i+1,k)+v(j,i,k)) - &
+                      0.0625_rkx * (v(j,i+2,k)+v(j,i-1,k))
+        end do
+      end do
+    end do
+!$acc end parallel
+    if ( ma%has_bdybottom ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jce1 , jce2
+          vx(j,ice1,k) = d_half * (v(j,ide1,k)+v(j,idi1,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+    if ( ma%has_bdytop ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
+      do k = 1 , kz
+        do j = jce1 , jce2
+          vx(j,ice2,k) = d_half*(v(j,ide2,k) + v(j,idi2,k))
+        end do
+      end do
+!$acc end parallel
+    end if
+  end subroutine uvstagtox
+
+  subroutine divdamp(dts)
+    implicit none
+    real(rkx) , intent(in) :: dts
+    integer(ik4) :: i , j , k
+    real(rkx) :: ddamp1
+
+    ddamp1 = ddamp*0.125_rkx*dx**2/dts
+    if ( lrotllr ) then
+!!$acc parallel present(u, rmu, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          do j = jdi1 , jdi2
+            u(j,i,k) = u(j,i,k) + &
+                ddamp1/(dx*rmu(j,i))*(zdiv2(j,i,k)-zdiv2(j-1,i,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+!!$acc parallel present(v, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = idi1 , idi2
+          do j = jci1 , jci2
+            v(j,i,k) = v(j,i,k) + &
+                ddamp1/dx*(zdiv2(j,i,k)-zdiv2(j,i-1,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+    else
+!!$acc parallel present(u, rmu, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = ici1 , ici2
+          do j = jdi1 , jdi2
+            u(j,i,k) = u(j,i,k) + &
+                ddamp1/(dx*rmu(j,i))*(zdiv2(j,i,k)-zdiv2(j-1,i,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+!!$acc parallel present(v, rmv, zdiv2)
+!!$acc loop collapse(3)
+      do k = 1 , kz
+        do i = idi1 , idi2
+          do j = jci1 , jci2
+            v(j,i,k) = v(j,i,k) + &
+                ddamp1/(dx*rmv(j,i))*(zdiv2(j,i,k)-zdiv2(j,i-1,k))
+          end do
+        end do
+      end do
+!!$acc end parallel
+    end if
+  end subroutine divdamp
+
+end module mod_moloch
+
+! vim: tabstop=8 expandtab shiftwidth=2 softtabstop=2
+!$acc loop collapse(2)
+            do k = 2 , kz
+              do j = jci1 , jci2
+                zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
+                zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
+                zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * wz(j,i,k)
+                wz(j,i,k) = wz(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
+              end do
+            end do
+            !do k = 1 , kz
+            !  do j = jci1 , jci2
+            !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
+            !    wz(j,i,k) = pp(j,i,k) - wfw(j,k) + wfw(j,k+1) + zdv
+            !  end do
+            !end do
+!$acc end parallel
+          end do
         end if
 
         if ( ma%has_bdybottom ) then
