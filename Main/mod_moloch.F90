@@ -119,21 +119,21 @@ module mod_moloch
   subroutine allocate_moloch
     implicit none
     call getmem1d(gzitak,1,kzp1,'moloch:gzitak')
-!!$acc enter data create(gzitak)
+!$acc enter data create(gzitak)
     call getmem1d(gzitakh,1,kz,'moloch:gzitakh')
-!!$acc enter data create(gzitakh)
+!$acc enter data create(gzitakh)
     call getmem2d(p2d,jdi1,jdi2,idi1,idi2,'moloch:p2d')
 !$acc enter data create(p2d)
     call getmem3d(deltaw,jce1ga,jce2ga,ice1ga,ice2ga,1,kzp1,'moloch:deltaw')
-!!$acc enter data create(deltaw)
+!$acc enter data create(deltaw)
     call getmem3d(s,jci1,jci2,ici1,ici2,1,kzp1,'moloch:s')
 !$acc enter data create(s)
     call getmem3d(wx,jce1,jce2,ice1,ice2,1,kz,'moloch:wx')
 !$acc enter data create(wx)
     call getmem3d(zdiv2,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'moloch:zdiv2')
-!!$acc enter data create(zdiv2)
+!$acc enter data create(zdiv2)
     call getmem3d(wwkw,jci1,jci2,ici1,ici2,1,kzp1,'moloch:wwkw')
-!!$acc enter data create(wwkw)
+!$acc enter data create(wwkw)
     call getmem3d(wz,jci1,jci2,ice1gb,ice2gb,1,kz,'moloch:wz')
 !$acc enter data create(wz)
     call getmem2d(wfw,jci1,jci2,1,kzp1,'moloch:wfw')
@@ -151,7 +151,7 @@ module mod_moloch
     call getmem2d(rmv,jde1,jde2,ide1ga,ide2ga,'moloch:rmv')
 !$acc enter data create(rmv)
     call getmem2d(coru,jde1,jde2,ice1,ice2,'moloch:coru')
-!!$acc enter data create(coru)
+!$acc enter data create(coru)
     call getmem2d(corv,jce1,jce2,ide1,ide2,'moloch:corv')
     if ( ibltyp == 2 ) then
       call getmem3d(tkex,jce1,jce2,ice1,ice2,1,kz,'moloch:tkex')
@@ -160,21 +160,21 @@ module mod_moloch
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
       call getmem3d(qen0,jci1,jci2,ici1,ici2,1,kz,'moloch:qen0')
-!!$acc enter data create(ten0, qen0)
+!$acc enter data create(ten0, qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
         call getmem4d(chiten0,jci1,jci2,ici1,ici2,1,kz,1,ntr,'moloch:chiten0')
-!!$acc enter data create(chiten0)
+!$acc enter data create(chiten0)
       end if
     end if
     call getmem3d(ud,jde1ga,jde2ga,ice1ga,ice2ga,1,kz,'moloch:ud')
     call getmem3d(vd,jce1ga,jce2ga,ide1ga,ide2ga,1,kz,'moloch:vd')
-!!$acc enter data create(vd)
+!$acc enter data create(vd)
     if ( ifrayd == 1 ) then
       call getmem3d(zetau,jdi1,jdi2,ici1,ici2,1,kz,'moloch:zetau')
       call getmem3d(zetav,jci1,jci2,idi1,idi2,1,kz,'moloch:zetav')
-!!$acc enter data create(zetau, zetav)
+!$acc enter data create(zetau, zetav)
     end if
     do_filterpai = mo_filterpai
     if ( do_fulleq ) then
@@ -190,7 +190,7 @@ module mod_moloch
     end if
     if ( do_filtertheta ) then
       call getmem3d(tf,jce1,jce2,ice1,ice2,1,kz,'moloch:tf')
-!!$acc enter data create(tf)
+!$acc enter data create(tf)
     end if
   end subroutine allocate_moloch
 
@@ -202,9 +202,9 @@ module mod_moloch
     call assignpnt(mddom%msfx,mx)
 !$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
-!!$acc enter data create(hx)
+!$acc enter data create(hx)
     call assignpnt(mddom%hy,hy)
-!!$acc enter data create(hy)
+!$acc enter data create(hy)
     call assignpnt(mddom%xlat,xlat)
     call assignpnt(mddom%xlon,xlon)
     call assignpnt(mddom%ht,ht)
@@ -269,10 +269,12 @@ module mod_moloch
 !$acc enter data create(trac)
     end if
     if ( ifrayd == 1 ) then
-!!$acc update device(zetau)
+!$acc update device(zeta, zetau)
         call xtoustag(zeta,zetau)
-!!$acc update device(zetav)
+!$acc update self(zeta, zetau)
+!$acc update device(zeta, zetav)
       call xtovstag(zeta,zetav)
+!$acc update self(zeta, zetav)
     end if
     coru = eomeg2*sin(mddom%ulat(jde1:jde2,ice1:ice2)*degrad)
     corv = eomeg2*sin(mddom%vlat(jce1:jce2,ide1:ide2)*degrad)
@@ -289,8 +291,6 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
-! Static arrays transfers to GPU
-!$acc update device(zeta)
   end subroutine init_moloch
 
   !
@@ -329,7 +329,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(p,qsat)
+!$acc update self(p, qsat)
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
 !$acc update device(qv, qc, qi, qr, qs)
@@ -358,7 +358,7 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
-!$acc update self(qwltot,qwitot)
+!$acc update self(qwltot, qwitot)
         end if
       else
 !$acc update device(qv, qc)
@@ -372,6 +372,7 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
+!$acc update self(tvirt)
       end if
     else
 !$acc update device(qv)
@@ -407,16 +408,19 @@ module mod_moloch
 !$acc update self(tetav)
 
     if ( idiag > 0 ) then
-!!$acc kernels present(t, ten0, qv, qen0)
+!$acc kernels present(t, ten0, qv, qen0)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
-!!$acc end kernels
+!$acc end kernels
+!$acc update self(ten0, qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
-!!$acc kernels present(trac, chiten0)
+!$acc update device(trac)
+!$acc kernels present(trac, chiten0)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
-!!$acc end kernels
+!$acc end kernels
+!$acc update self(chiten0)
       end if
     end if
 
@@ -424,12 +428,14 @@ module mod_moloch
 !$acc kernels present(pf, pai)
       pf = pai(jce1:jce2,ice1:ice2,:)
 !$acc end kernels
+!$acc update self(pf)
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
 !$acc kernels present(tf, tetav)
         tf = tetav(jce1:jce2,ice1:ice2,:)
 !$acc end kernels
+!$acc update self(tf)
       end if
     end if
 
@@ -441,13 +447,14 @@ module mod_moloch
 
     end do ! Advection loop
 
-!$acc update device(pai, tetav)
-
     if ( do_filterpai ) then
+!$acc update device(pai, pf)
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) - pf
 !$acc end kernels
+!$acc update self(pai)
       call filtpai
+!$acc update device(pai, pf)
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
 !$acc end kernels
@@ -455,10 +462,13 @@ module mod_moloch
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
+!$acc update device(tetav, tf)
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
 !$acc end kernels
+!$acc update self(tetav)
         call filttheta
+!$acc update device(tetav, tf)
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
 !$acc end kernels
