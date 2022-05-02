@@ -476,6 +476,7 @@ module mod_moloch
       end if
     end if
 
+!$acc update device(tetav, pai)
 !$acc parallel present(tvirt, tetav, pai)
 !$acc loop collapse(3)
     do k = 1 , kz
@@ -516,6 +517,7 @@ module mod_moloch
 !$acc end parallel
       end if
     else
+!$acc update device(qv)
 !$acc parallel present(t, tvirt, qv)
 !$acc loop collapse(3)
       do k = 1 , kz
@@ -530,14 +532,19 @@ module mod_moloch
 !$acc update self(t)
 
     if ( idiag > 0 ) then
-!$acc update self(qv)
+!$acc update device(ten0, qen0)
+!$acc kernels present(t, qv, ten0, qen0)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
+!$acc end kernels
     end if
 
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
+!$acc update device(trac, chiten0)
+!$acc kernels preset(trac, chiten0)
         cadvhdiag = (trac(jci1:jci2,ici1:ici2,:,:) - chiten0) * rdt
+!$acc end kernels
       end if
     end if
 !$acc parallel present(p, pai, rho, t)
@@ -554,6 +561,7 @@ module mod_moloch
 !$acc update self(p,rho)
 
     !jday = yeardayfrac(rcmtimer%idate)
+!$acc update device(zeta)
 !$acc parallel present(zeta, tvirt, ps, p)
 !$acc loop collapse(2)
     do i = ice1 , ice2
@@ -738,7 +746,6 @@ module mod_moloch
             cbdydiag = trac(jci1:jci2,ici1:ici2,:,:) - chiten0
           end if
         end if
-!!$acc update device(ux, vx)
         call uvstagtox(u,v,ux,vx)
       end subroutine boundary
 
