@@ -753,10 +753,11 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
-!!$acc parallel present(zdiv2, p2d)
-!!$acc loop gang
+!$acc update device(zdiv2, p2d)
+!$acc parallel present(zdiv2, p2d)
+!$acc loop gang
         do k = 1 , kz
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (zdiv2(j-1,i,k) + zdiv2(j+1,i,k) + &
@@ -764,14 +765,15 @@ module mod_moloch
                          d_half   * zdiv2(j,i,k)
             end do
           end do
-!!$acc loop vector collapse(2)
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               zdiv2(j,i,k) = zdiv2(j,i,k) + mo_anu2 * p2d(j,i)
             end do
           end do
         end do
-!!$acc end parallel
+!$acc end parallel
+!$acc update self(zdiv2, p2d)
       end subroutine filt3d
 
       subroutine filtpai
@@ -782,8 +784,9 @@ module mod_moloch
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(pai)
 
+!$acc update device(p2d)
 !$acc parallel present(p2d, pai)
-!$acc loop seq
+!$acc loop gang
         do k = 1 , kz
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
@@ -801,6 +804,7 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
+!$acc update self(p2d, pai)
       end subroutine filtpai
 
       subroutine filttheta
@@ -811,8 +815,9 @@ module mod_moloch
         call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(tetav)
 
+!$acc update device(p2d)
 !$acc parallel present(p2d, tetav)
-!$acc loop seq
+!$acc loop gang
         do k = 1 , kz
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
@@ -830,6 +835,7 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
+!$acc update self(p2d, tetav)
       end subroutine filttheta
 
       subroutine sound(dts)
@@ -1209,44 +1215,32 @@ module mod_moloch
         real(rkx) :: dta
         real(rkx) , pointer , dimension(:,:,:) :: ptr
 
-!$acc update device(u, v, ux, vx)
         call uvstagtox(u,v,ux,vx)
 
         ! Compute W (and TKE if required) on zita levels
 
-!$acc update device(w, wx)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
-!$acc update device(tke, tkex)
           call wstagtox(tke,tkex)
         end if
 
-!$acc update device(tetav, dta)
         call wafone(tetav,dta)
-!$acc update device(pai)
         call wafone(pai,dta)
-!$acc update device(ux)
         call wafone(ux,dta)
-!$acc update device(vx)
         call wafone(vx,dta)
-!$acc update device(wx)
         call wafone(wx,dta)
-!$acc update device(qv)
         call wafone(qv,dta)
         if ( ipptls > 0 ) then
-!$acc update device(qx)
           do n = iqfrst , iqlst
             call assignpnt(qx,ptr,n)
             call wafone(ptr,dta)
           end do
         end if
         if ( ibltyp == 2 ) then
-!$acc update device(tkex)
           call wafone(tkex,dta)
         end if
         if ( ichem == 1 ) then
-!$acc update device(trac)
           do n = 1 , ntr
             call assignpnt(trac,ptr,n)
             call wafone(ptr,dta)
@@ -1257,10 +1251,8 @@ module mod_moloch
         call xtouvstag(ux,vx,u,v)
 
         ! Back to half-levels
-!$acc update device(w)
         call xtowstag(wx,w)
         if ( ibltyp == 2 ) then
-!$acc update device(tke)
           call xtowstag(tkex,tke)
         end if
       end subroutine advection
@@ -1301,10 +1293,12 @@ module mod_moloch
           wfw(j,kzp1) = d_zero
         end do
 !$acc end parallel
+!$acc update self(wfw)
 
-        do i = ici1 , ici2
+!$acc update device(pp, s, fmzf, fmz)
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
-!$acc loop collapse(2)
+        do i = ici1 , ici2
+!$acc loop vector collapse(2)
           do k = 1 , kzm1
             do j = jci1 , jci2
               zamu = s(j,i,k+1) * zdtrdz
@@ -1328,9 +1322,7 @@ module mod_moloch
               !                              (d_one-zphi)*pp(j,i,k))
             end do
           end do
-!$acc end parallel
-!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
           do k = 1 , kz
             do j = jci1 , jci2
               zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
@@ -1339,7 +1331,6 @@ module mod_moloch
               wz(j,i,k) = pp(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
             end do
           end do
-!$acc end parallel
           !do k = 1 , kz
           !  do j = jci1 , jci2
           !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
@@ -1347,11 +1338,13 @@ module mod_moloch
           !  end do
           !end do
         end do
+!$acc end parallel
+!$acc update self(wfw, wz)
 
         if ( do_vadvtwice ) then
-          do i = ici1 , ici2
 !$acc parallel present(fmzf, wz, wfw, s, fmz)
-!$acc loop collapse(2)
+          do i = ici1 , ici2
+!$acc loop vector collapse(2)
             do k = 1 , kzm1
               do j = jci1 , jci2
                 zamu = s(j,i,k+1) * zdtrdz
@@ -1375,17 +1368,13 @@ module mod_moloch
                 !                              (d_one-zphi)*wz(j,i,k))
               end do
             end do
-!$acc end parallel
-!$acc parallel present(fmzf, wz, wfw, s, fmz)
-!$acc loop
+!$acc loop vector
             do j = jci1 , jci2
               zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
               zdv = -s(j,i,2) * zrfmd * wz(j,i,1)
               wz(j,i,1) = wz(j,i,1) + wfw(j,2) * zrfmd + zdv
             end do
-!$acc end parallel
-!$acc parallel present(fmzf, wz, wfw, s, fmz)
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
             do k = 2 , kz
               do j = jci1 , jci2
                 zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
@@ -1394,7 +1383,6 @@ module mod_moloch
                 wz(j,i,k) = wz(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
               end do
             end do
-!$acc end parallel
             !do k = 1 , kz
             !  do j = jci1 , jci2
             !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
@@ -1402,10 +1390,13 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
+!$acc update self(wfw, wz)
         end if
 
         if ( ma%has_bdybottom ) then
 !$acc parallel present(wz)
+!$acc loop collapse(2)
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice1,k) = wz(j,ici1,k)
@@ -1415,6 +1406,7 @@ module mod_moloch
         end if
         if ( ma%has_bdytop ) then
 !$acc parallel present(wz)
+!$acc loop collapse(2)
           do k = 1 , kz
             do j = jci1 , jci2
               wz(j,ice2,k) = wz(j,ici2,k)
@@ -1431,9 +1423,10 @@ module mod_moloch
 
           ! Meridional advection
 
-          do k = 1 , kz
+!$acc update device(rmv, v, mx)
 !$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
-!$acc loop collapse(2)
+          do k = 1 , kz
+!$acc loop vector collapse(2)
             do i = ici1 , ice2ga
               do j = jci1 , jci2
                 zamu = v(j,i,k) * zdtrdy
@@ -1455,9 +1448,7 @@ module mod_moloch
                 !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
               end do
             end do
-!$acc end parallel
-!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
@@ -1469,7 +1460,6 @@ module mod_moloch
                       zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv
               end do
             end do
-!$acc end parallel
             !do i = ici1 , ici2
             !  do j = jci1 , jci2
             !    zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
@@ -1479,9 +1469,12 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
+!$acc update self(zpby, p0)
 
           if ( ma%has_bdyleft ) then
 !$acc parallel present(p0)
+!$acc loop collapse(2)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce1,i,k) = p0(jci1,i,k)
@@ -1492,6 +1485,7 @@ module mod_moloch
 
           if ( ma%has_bdyright ) then
 !$acc parallel present(p0)
+!$acc loop collapse(2)
             do k = 1 , kz
               do i = ici1 , ici2
                 p0(jce2,i,k) = p0(jci2,i,k)
@@ -1506,9 +1500,10 @@ module mod_moloch
 
           ! Zonal advection
 
-          do k = 1 , kz
+!$acc update device(mu, u)
 !$acc parallel present(fmz, pp, mu, zpbw, u, p0)
-!$acc loop collapse(2)
+          do k = 1 , kz
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jce2ga
                 zamu = u(j,i,k) * mu(j,i) * zdtrdx
@@ -1530,8 +1525,6 @@ module mod_moloch
                 !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
               end do
             end do
-!$acc end parallel
-!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
 !$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -1543,7 +1536,6 @@ module mod_moloch
                      zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv
               end do
             end do
-!$acc end parallel
             !do i = ici1 , ici2
             !  do j = jci1 , jci2
             !    zrfme = mu(j+1,i) * zdtrdx
@@ -1553,14 +1545,17 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
+!$acc update self(zpbw, pp)
 
         else
 
           ! Meridional advection
 
-          do k = 1 , kz
+!$acc update device(rmv, v, mx2)
 !$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
-!$acc loop collapse(2)
+          do k = 1 , kz
+!$acc loop vector collapse(2)
             do i = ici1 , ice2ga
               do j = jci1 , jci2
                 zamu = v(j,i,k) * rmv(j,i) * zdtrdy
@@ -1581,9 +1576,7 @@ module mod_moloch
                 !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
               end do
             end do
-!$acc end parallel
-!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zrfmn = zdtrdy * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
@@ -1594,7 +1587,6 @@ module mod_moloch
                   mx2(j,i) * (zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv)
               end do
             end do
-!$acc end parallel
             !do i = ici1 , ici2
             !  do j = jci1 , jci2
                 !zdv = (v(j,i+1,k) * rmv(j,i+1) - &
@@ -1604,6 +1596,8 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
+!$acc update self(zpby, p0)
 
           if ( ma%has_bdyleft ) then
 !$acc parallel present(p0)
@@ -1633,9 +1627,10 @@ module mod_moloch
 
           ! Zonal advection
 
-          do k = 1 , kz
+!$acc update device(rmu, u)
 !$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
-!$acc loop collapse(2)
+          do k = 1 , kz
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jce2ga
                 zamu = u(j,i,k) * rmu(j,i) * zdtrdx
@@ -1656,8 +1651,6 @@ module mod_moloch
                 !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
               end do
             end do
-!$acc end parallel
-!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
 !$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -1669,7 +1662,6 @@ module mod_moloch
                   mx2(j,i) * (zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv)
               end do
             end do
-!$acc end parallel
             !do i = ici1 , ici2
             !  do j = jci1 , jci2
             !    zdv = (u(j+1,i,k) * rmu(j+1,i) - &
@@ -1679,6 +1671,8 @@ module mod_moloch
             !  end do
             !end do
           end do
+!$acc end parallel
+!$acc update self(zpbw, pp)
         end if
 
       end subroutine wafone
