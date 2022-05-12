@@ -542,7 +542,7 @@ module mod_moloch
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
 !$acc update device(trac, chiten0)
-!$acc kernels preset(trac, chiten0)
+!$acc kernels present(trac, chiten0)
         cadvhdiag = (trac(jci1:jci2,ici1:ici2,:,:) - chiten0) * rdt
 !$acc end kernels
       end if
