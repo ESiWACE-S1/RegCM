@@ -1961,6 +1961,7 @@ module mod_moloch
     i2 = ubound(wx,2)
     j1 = lbound(wx,1)
     j2 = ubound(wx,1)
+!$acc update device(w)
 !$acc parallel present(wx, w)
 !$acc loop collapse(3)
     do k = 2 , kzm1
@@ -1981,6 +1982,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(wx)
   end subroutine wstagtox
 
   subroutine xtowstag(wx,w)
@@ -1989,6 +1991,7 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
     integer(ik4) :: i , j , k
 
+!$acc update device(wx)
 !$acc parallel present(w, wx)
 !$acc loop collapse(3)
     do k = 3 , kzm1
@@ -2009,6 +2012,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(w)
   end subroutine xtowstag
 
   subroutine xtoustag(ux,u)
@@ -2017,8 +2021,9 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u
     integer(ik4) :: i , j , k
 
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(3)
+!$acc update device(ux)
+!$acc parallel present(u, ux)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jdii1 , jdii2
@@ -2027,27 +2032,28 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdyright ) then
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi2,i,k) = d_half * (ux(jci2,i,k)+ux(jce2,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdyleft ) then
-!!$acc parallel present(u, ux)
-!!$acc loop collapse(2)
+!$acc parallel present(u, ux)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           u(jdi1,i,k) = d_half * (ux(jci1,i,k)+ux(jce1,i,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
+!$acc update self(u)
   end subroutine xtoustag
 
   subroutine xtovstag(vx,v)
@@ -2056,8 +2062,9 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: v
     integer(ik4) :: i , j , k
 
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(3)
+!$acc update device(vx)
+!$acc parallel present(v, vx)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = idii1 , idii2
         do j = jci1 , jci2
@@ -2066,27 +2073,28 @@ module mod_moloch
         end do
       end do
     end do
-!!$acc end parallel
+!$acc end parallel
     if ( ma%has_bdytop ) then
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi2,k) = d_half * (vx(j,ici2,k)+vx(j,ice2,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
     if ( ma%has_bdybottom ) then
-!!$acc parallel present(v, vx)
-!!$acc loop collapse(2)
+!$acc parallel present(v, vx)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           v(j,idi1,k) = d_half * (vx(j,ici1,k)+vx(j,ice1,k))
         end do
       end do
-!!$acc end parallel
+!$acc end parallel
     end if
+!$acc update self(v)
   end subroutine xtovstag
 
   subroutine xtouvstag(ux,vx,u,v)
@@ -2095,7 +2103,6 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     integer(ik4) :: i , j , k
 
-!$acc update self(ux, vx)
     call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
     call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(ux, vx)
@@ -2165,6 +2172,7 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
+!$acc update self(u, v)
   end subroutine xtouvstag
 
   subroutine uvstagtox(u,v,ux,vx)
@@ -2173,7 +2181,6 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
-!$acc update self(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
 !$acc update device(u, v)
@@ -2243,6 +2250,7 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
+!$acc update self(ux, vx)
   end subroutine uvstagtox
 
   subroutine divdamp(dts)
