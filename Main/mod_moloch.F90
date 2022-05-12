@@ -1525,7 +1525,7 @@ module mod_moloch
                 !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
               end do
             end do
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zcostx = zdtrdx * mu(j,i)
@@ -1651,7 +1651,7 @@ module mod_moloch
                 !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
               end do
             end do
-!$acc loop collapse(2)
+!$acc loop vector collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zrfme = zdtrdx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
