@@ -269,12 +269,8 @@ module mod_moloch
 !$acc enter data create(trac)
     end if
     if ( ifrayd == 1 ) then
-!$acc update device(zeta, zetau)
         call xtoustag(zeta,zetau)
-!$acc update self(zeta, zetau)
-!$acc update device(zeta, zetav)
-      call xtovstag(zeta,zetav)
-!$acc update self(zeta, zetav)
+        call xtovstag(zeta,zetav)
     end if
     coru = eomeg2*sin(mddom%ulat(jde1:jde2,ice1:ice2)*degrad)
     corv = eomeg2*sin(mddom%vlat(jce1:jce2,ide1:ide2)*degrad)
@@ -452,9 +448,7 @@ module mod_moloch
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) - pf
 !$acc end kernels
-!$acc update self(pai)
       call filtpai
-!$acc update device(pai, pf)
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
 !$acc end kernels
@@ -466,9 +460,7 @@ module mod_moloch
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
 !$acc end kernels
-!$acc update self(tetav)
         call filttheta
-!$acc update device(tetav, tf)
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
 !$acc end kernels
