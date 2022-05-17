@@ -1285,7 +1285,6 @@ module mod_moloch
           wfw(j,kzp1) = d_zero
         end do
 !$acc end parallel
-!$acc update self(wfw)
 
 !$acc update device(pp, s, fmzf, fmz)
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
@@ -1331,7 +1330,6 @@ module mod_moloch
           !end do
         end do
 !$acc end parallel
-!$acc update self(wfw, wz)
 
         if ( do_vadvtwice ) then
 !$acc parallel present(fmzf, wz, wfw, s, fmz)
@@ -1383,7 +1381,6 @@ module mod_moloch
             !end do
           end do
 !$acc end parallel
-!$acc update self(wfw, wz)
         end if
 
         if ( ma%has_bdybottom ) then
@@ -1462,7 +1459,6 @@ module mod_moloch
             !end do
           end do
 !$acc end parallel
-!$acc update self(zpby, p0)
 
           if ( ma%has_bdyleft ) then
 !$acc parallel present(p0)
