@@ -199,6 +199,7 @@ module mod_moloch
     call assignpnt(mddom%msfu,mu)
 !$acc enter data create(mu)
     call assignpnt(mddom%msfv,mv)
+!$acc enter data create(mv)
     call assignpnt(mddom%msfx,mx)
 !$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
@@ -287,6 +288,8 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
+! Update static arrays on device
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf)
   end subroutine init_moloch
 
   !
@@ -438,6 +441,8 @@ module mod_moloch
     do jadv = 1 , nadv
 
       call sound(dtsound)
+
+!$acc update device(s)
 
       call advection(dtstepa)
 
@@ -738,7 +743,9 @@ module mod_moloch
             cbdydiag = trac(jci1:jci2,ici1:ici2,:,:) - chiten0
           end if
         end if
+!$acc update device(u,v)
         call uvstagtox(u,v,ux,vx)
+!$acc update self(ux,vx)
       end subroutine boundary
 
       subroutine filt3d
@@ -1207,45 +1214,59 @@ module mod_moloch
         real(rkx) :: dta
         real(rkx) , pointer , dimension(:,:,:) :: ptr
 
+!$acc update device(u,v)
         call uvstagtox(u,v,ux,vx)
 
         ! Compute W (and TKE if required) on zita levels
 
+!$acc update device(w)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
+!$acc update device(tke)
           call wstagtox(tke,tkex)
         end if
 
+! u,v are on the device after uvstagtox
+!$acc update device(tetav, pai, qv)
         call wafone(tetav,dta)
         call wafone(pai,dta)
         call wafone(ux,dta)
         call wafone(vx,dta)
         call wafone(wx,dta)
         call wafone(qv,dta)
+!$acc update self(tetav, pai, qv, ux, vx, wx)
         if ( ipptls > 0 ) then
           do n = iqfrst , iqlst
             call assignpnt(qx,ptr,n)
+!$acc update device(ptr)
             call wafone(ptr,dta)
+!$acc update self(ptr)
           end do
         end if
         if ( ibltyp == 2 ) then
           call wafone(tkex,dta)
+!$acc update self(tkex)
         end if
         if ( ichem == 1 ) then
           do n = 1 , ntr
             call assignpnt(trac,ptr,n)
+!$acc update device(ptr)
             call wafone(ptr,dta)
+!$acc update self(ptr)
           end do
         end if
 
         ! Interpolate on staggered points
         call xtouvstag(ux,vx,u,v)
+!$acc update self(u,v)
 
         ! Back to half-levels
         call xtowstag(wx,w)
+!$acc update self(w)
         if ( ibltyp == 2 ) then
           call xtowstag(tkex,tke)
+!$acc update self(tke)
         end if
       end subroutine advection
 
@@ -1257,6 +1278,7 @@ module mod_moloch
         rdeno = (t1-t2)/sign(max(abs(zzden),minden),zzden)
       end function rdeno
 
+! Fully device-resident: make sure all IO is on the GPU before calling wafone
       subroutine wafone(pp,dta)
         implicit none
         real(rkx) , dimension(:,:,:) , pointer , intent(inout) :: pp
@@ -1286,7 +1308,6 @@ module mod_moloch
         end do
 !$acc end parallel
 
-!$acc update device(pp, s, fmzf, fmz)
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
         do i = ici1 , ici2
 !$acc loop vector collapse(2)
@@ -1412,7 +1433,6 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc update device(rmv, v, mx)
 !$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1488,7 +1508,6 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc update device(mu, u)
 !$acc parallel present(fmz, pp, mu, zpbw, u, p0)
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1534,13 +1553,11 @@ module mod_moloch
             !end do
           end do
 !$acc end parallel
-!$acc update self(zpbw, pp)
 
         else
 
           ! Meridional advection
 
-!$acc update device(rmv, v, mx2)
 !$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1585,7 +1602,6 @@ module mod_moloch
             !end do
           end do
 !$acc end parallel
-!$acc update self(zpby, p0)
 
           if ( ma%has_bdyleft ) then
 !$acc parallel present(p0)
@@ -1615,7 +1631,6 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc update device(rmu, u)
 !$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1660,7 +1675,6 @@ module mod_moloch
             !end do
           end do
 !$acc end parallel
-!$acc update self(zpbw, pp)
         end if
 
       end subroutine wafone
@@ -1939,6 +1953,7 @@ module mod_moloch
 
   end subroutine moloch
 
+! Fully device-resident: make sure all IO is on the GPU for this subroutine
   subroutine wstagtox(w,wx)
     implicit none
     real(rkx) , intent(in) , dimension(:,:,:) , pointer :: w
@@ -1949,7 +1964,7 @@ module mod_moloch
     i2 = ubound(wx,2)
     j1 = lbound(wx,1)
     j2 = ubound(wx,1)
-!$acc update device(w)
+
 !$acc parallel present(wx, w)
 !$acc loop collapse(3)
     do k = 2 , kzm1
@@ -1970,16 +1985,15 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(wx)
   end subroutine wstagtox
 
+! Fully device-resident: make sure all IO is on the GPU for this subroutine
   subroutine xtowstag(wx,w)
     implicit none
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: wx
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: w
     integer(ik4) :: i , j , k
 
-!$acc update device(wx)
 !$acc parallel present(w, wx)
 !$acc loop collapse(3)
     do k = 3 , kzm1
@@ -2000,7 +2014,6 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(w)
   end subroutine xtowstag
 
   subroutine xtoustag(ux,u)
@@ -2085,12 +2098,14 @@ module mod_moloch
 !$acc update self(v)
   end subroutine xtovstag
 
+! Fully device-resident: make sure all IO is on the GPU for this subroutine
   subroutine xtouvstag(ux,vx,u,v)
     implicit none
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     integer(ik4) :: i , j , k
 
+!$acc update self(ux, vx)
     call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
     call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(ux, vx)
@@ -2160,15 +2175,16 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
-!$acc update self(u, v)
   end subroutine xtouvstag
 
+! Fully device-resident: make sure all IO is on the GPU for this subroutine
   subroutine uvstagtox(u,v,ux,vx)
     implicit none
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
+!$acc update self(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
 !$acc update device(u, v)
@@ -2238,7 +2254,6 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
-!$acc update self(ux, vx)
   end subroutine uvstagtox
 
   subroutine divdamp(dts)

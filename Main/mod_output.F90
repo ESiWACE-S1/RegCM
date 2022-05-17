@@ -225,7 +225,9 @@ module mod_output
         end if
         if ( associated(atm_u_out) .and. associated(atm_v_out) ) then
           if ( idynamic == 3 ) then
+!$acc update device(mo_atm%ux,mo_atm%vx)
             call uvstagtox(mo_atm%u,mo_atm%v,mo_atm%ux,mo_atm%vx)
+!$acc update self(mo_atm%u,mo_atm%v)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -257,9 +259,9 @@ module mod_output
         end if
         if ( associated(atm_w_out) ) then
           if ( idynamic == 3 ) then
-!$acc update device(mo_atm%w, atm_w_out)
+!$acc update device(mo_atm%w)
             call wstagtox(mo_atm%w,atm_w_out)
-!$acc update self(mo_atm%w, atm_w_out)
+!$acc update self(atm_w_out)
           else
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1018,7 +1020,9 @@ module mod_output
         if ( associated(srf_ua100_out) .and. &
              associated(srf_va100_out) ) then
           if ( idynamic == 3 ) then
+            !$acc update device(mo_atm%u,mo_atm%v)
             call uvstagtox(mo_atm%u,mo_atm%v,mo_atm%ux,mo_atm%vx)
+            !$acc update self(mo_atm%ux,mo_atm%vx)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zz = mo_atm%zeta(j,i,kz)
