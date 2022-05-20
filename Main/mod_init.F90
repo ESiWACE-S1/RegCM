@@ -1035,6 +1035,7 @@ module mod_init
       else
         ffilt(:) = d_zero
       end if
+!$acc update device(ffilt)
     end if
     call initialize_surface_model
     if ( idynamic /= 3 ) then
