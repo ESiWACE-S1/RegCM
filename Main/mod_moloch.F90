@@ -161,12 +161,10 @@ module mod_moloch
     if ( idiag > 0 ) then
       call getmem3d(ten0,jci1,jci2,ici1,ici2,1,kz,'moloch:ten0')
       call getmem3d(qen0,jci1,jci2,ici1,ici2,1,kz,'moloch:qen0')
-!$acc enter data create(ten0, qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
         call getmem4d(chiten0,jci1,jci2,ici1,ici2,1,kz,1,ntr,'moloch:chiten0')
-!$acc enter data create(chiten0)
       end if
     end if
     call getmem3d(ud,jde1ga,jde2ga,ice1ga,ice2ga,1,kz,'moloch:ud')
@@ -253,12 +251,12 @@ module mod_moloch
         call assignpnt(mo_atm%qx,qi,iqi)
         call assignpnt(mo_atm%qx,qr,iqr)
         call assignpnt(mo_atm%qx,qs,iqs)
-!$acc enter data create(qr,qi,qs)
+!$acc enter data attach(qr,qi,qs)
       else
         if ( do_fulleq ) then
           call assignpnt(mo_atm%qx,qwltot,iqc)
           call assignpnt(mo_atm%qx,qwitot,iqc)
-!$acc enter data create(qwltot,qwitot)
+!$acc enter data attach(qwltot,qwitot)
         end if
       end if
     end if
@@ -317,9 +315,10 @@ module mod_moloch
     dtsound = dtstepa / real(nsound,rkx)
     iconvec = 0
 
+!$acc update device(u, v, w, pai, t, qx)
+    
     call reset_tendencies
 
-!$acc update device(pai, t)
 !$acc parallel present(p, pai, qsat, t)
 !$acc loop collapse(3)
     do k = 1 , kz
@@ -331,10 +330,8 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(p, qsat)
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
-!$acc update device(qv, qc, qi, qr, qs)
 !$acc parallel present(tvirt, t, qv, qc, qi, qr, qs)
 !$acc loop collapse(3)
         do k = 1 , kz
@@ -347,7 +344,6 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc update self(tvirt)
         if ( do_fulleq ) then
 !$acc parallel present(qwltot, qwitot, qc, qi, qr, qs)
 !$acc loop collapse(3)
@@ -360,7 +356,6 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
-!$acc update self(qwltot, qwitot)
         end if
       else
 !$acc update device(qv, qc)
@@ -374,10 +369,8 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc update self(tvirt)
       end if
     else
-!$acc update device(qv)
 !$acc parallel present(tvirt, t, qv)
 !$acc loop collapse(3)
       do k = 1 , kz
@@ -388,13 +381,11 @@ module mod_moloch
         end do
       end do
 !$acc end parallel
-!$acc update self(tvirt)
       if ( do_fulleq ) then
 !$acc kernels present(qwltot, qwitot)
         qwltot(:,:,:) = d_zero
         qwitot(:,:,:) = d_zero
 !$acc end kernels
-!$acc update self(qwltot,qwitot)
       end if
     end if
 !$acc parallel present(tetav, tvirt, pai)
@@ -407,22 +398,14 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(tetav)
 
     if ( idiag > 0 ) then
-!$acc kernels present(t, ten0, qv, qen0)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
-!$acc end kernels
-!$acc update self(ten0, qen0)
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
-!$acc update device(trac)
-!$acc kernels present(trac, chiten0)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
-!$acc end kernels
-!$acc update self(chiten0)
       end if
     end if
 
@@ -430,14 +413,12 @@ module mod_moloch
 !$acc kernels present(pf, pai)
       pf = pai(jce1:jce2,ice1:ice2,:)
 !$acc end kernels
-!$acc update self(pf)
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
 !$acc kernels present(tf, tetav)
         tf = tetav(jce1:jce2,ice1:ice2,:)
 !$acc end kernels
-!$acc update self(tf)
       end if
     end if
 
@@ -448,13 +429,8 @@ module mod_moloch
       call advection(dtstepa)
 
     end do ! Advection loop
-!$acc update self(u,v,w,pai,tetav,qv)
-!$acc update self(qx) if(ipptls > 0)
-!$acc update self(tke) if(ibltyp == 2)
-!$acc update self(trac) if(ichem == 1)
 
     if ( do_filterpai ) then
-!$acc update device(pai, pf)
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) - pf
 !$acc end kernels
@@ -462,11 +438,9 @@ module mod_moloch
 !$acc kernels present(pai, pf)
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
 !$acc end kernels
-!$acc update self(pai)
     end if
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
-!$acc update device(tetav, tf)
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) - tf
 !$acc end kernels
@@ -474,11 +448,9 @@ module mod_moloch
 !$acc kernels present(tetav, tf)
         tetav(jce1:jce2,ice1:ice2,:) = tetav(jce1:jce2,ice1:ice2,:) + tf
 !$acc end kernels
-!$acc update self(tetav)
       end if
     end if
 
-!$acc update device(tetav, pai)
 !$acc parallel present(tvirt, tetav, pai)
 !$acc loop collapse(3)
     do k = 1 , kz
@@ -489,11 +461,9 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(tvirt)
 
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
-!$acc update device(qv, qc, qi, qr, qs)
 !$acc parallel present(t, tvirt, qv, qc, qi, qr, qs)
 !$acc loop collapse(3)
         do k = 1 , kz
@@ -506,7 +476,6 @@ module mod_moloch
         end do
 !$acc end parallel
       else
-!$acc update device(qv, qc)
 !$acc parallel present(t, tvirt, qv, qc)
 !$acc loop collapse(3)
         do k = 1 , kz
@@ -519,7 +488,6 @@ module mod_moloch
 !$acc end parallel
       end if
     else
-!$acc update device(qv)
 !$acc parallel present(t, tvirt, qv)
 !$acc loop collapse(3)
       do k = 1 , kz
@@ -531,22 +499,16 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
-!$acc update self(t)
-
     if ( idiag > 0 ) then
-!$acc update device(ten0, qen0)
-!$acc kernels present(t, qv, ten0, qen0)
+!$acc update self(t, qv)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
-!$acc end kernels
     end if
 
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
-!$acc update device(trac, chiten0)
-!$acc kernels present(trac, chiten0)
+!$acc update self(trac)
         cadvhdiag = (trac(jci1:jci2,ici1:ici2,:,:) - chiten0) * rdt
-!$acc end kernels
       end if
     end if
 !$acc parallel present(p, pai, rho, t)
@@ -560,7 +522,6 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(p,rho)
 
     !jday = yeardayfrac(rcmtimer%idate)
 !$acc update device(zeta)
@@ -577,7 +538,6 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(ps)
     !
     ! Recompute saturation
     !
@@ -591,7 +551,11 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(qsat)
+
+!$acc update self(u, v, w, t, pai, tetav, ps, p, rho, qx)
+!$acc update self(tke) if(ibltyp == 2)
+!$acc update self(trac) if(ichem == 1)
+
     !
     ! Mass check
     !
@@ -680,18 +644,14 @@ module mod_moloch
       subroutine boundary
         implicit none
 
-!!$acc update self(ps, u, v, t, qv, pai)
         call exchange_lrbt(ps,1,jce1,jce2,ice1,ice2)
         call exchange_lrbt(u,1,jde1,jde2,ice1,ice2,1,kz)
         call exchange_lrbt(v,1,jce1,jce2,ide1,ide2,1,kz)
         call exchange_lrbt(t,1,jce1,jce2,ice1,ice2,1,kz)
         call exchange_lrbt(qv,1,jce1,jce2,ice1,ice2,1,kz)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
-!!$acc update device(ps, u, v, t, qv, pai)
         if ( ichem == 1 ) then
-!!$acc update self(trac)
           call exchange_lrbt(trac,1,jce1,jce2,ice1,ice2,1,kz,1,ntr)
-!!$acc update device(trac)
         end if
 
         if ( idiag > 0 ) then
@@ -1207,59 +1167,47 @@ module mod_moloch
         real(rkx) :: dta
         real(rkx) , pointer , dimension(:,:,:) :: ptr
 
-!!$acc update device(u,v)
         call uvstagtox(u,v,ux,vx)
 
         ! Compute W (and TKE if required) on zita levels
 
-!!$acc update device(w)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
-!!$acc update device(tke)
           call wstagtox(tke,tkex)
         end if
 
 ! u,v are on the device after uvstagtox
-!!$acc update device(tetav, pai, qv)
         call wafone(tetav,dta)
         call wafone(pai,dta)
         call wafone(ux,dta)
         call wafone(vx,dta)
         call wafone(wx,dta)
         call wafone(qv,dta)
-!!$acc update self(tetav, pai, qv, ux, vx, wx)
+
         if ( ipptls > 0 ) then
           do n = iqfrst , iqlst
             call assignpnt(qx,ptr,n)
-!!$acc update device(ptr)
             call wafone(ptr,dta)
-!!$acc update self(ptr)
           end do
         end if
         if ( ibltyp == 2 ) then
           call wafone(tkex,dta)
-!!$acc update self(tkex)
         end if
         if ( ichem == 1 ) then
           do n = 1 , ntr
             call assignpnt(trac,ptr,n)
-!!$acc update device(ptr)
             call wafone(ptr,dta)
-!!$acc update self(ptr)
           end do
         end if
 
         ! Interpolate on staggered points
         call xtouvstag(ux,vx,u,v)
-!!$acc update self(u,v)
 
         ! Back to half-levels
         call xtowstag(wx,w)
-!!$acc update self(w)
         if ( ibltyp == 2 ) then
           call xtowstag(tkex,tke)
-!!$acc update self(tke)
         end if
       end subroutine advection
 
@@ -1303,6 +1251,7 @@ module mod_moloch
 !$acc end parallel
 
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
+!$acc loop seq
         do i = ici1 , ici2
 !$acc loop vector collapse(2)
           do k = 1 , kzm1
@@ -1428,7 +1377,7 @@ module mod_moloch
           ! Meridional advection
 
 !$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
-!$acc loop independent
+!$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
             do i = ici1 , ice2ga
@@ -1504,7 +1453,7 @@ module mod_moloch
           ! Zonal advection
 
 !$acc parallel present(fmz, pp, mu, zpbw, u, p0)
-!$acc loop independent
+!$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
             do i = ici1 , ici2
@@ -1555,7 +1504,7 @@ module mod_moloch
           ! Meridional advection
 
 !$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
-!$acc loop independent
+!$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
             do i = ici1 , ice2ga
@@ -1629,7 +1578,7 @@ module mod_moloch
           ! Zonal advection
 
 !$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
-!$acc loop independent
+!$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
             do i = ici1 , ici2
@@ -1679,10 +1628,11 @@ module mod_moloch
 
       subroutine reset_tendencies
         implicit none
-
+!$acc kernels present(s, deltaw, zdiv2)
         s(:,:,:) = d_zero
         deltaw(:,:,:) = d_zero
         zdiv2(:,:,:) = d_zero
+!$acc end kernels
         mo_atm%tten = d_zero
         mo_atm%qxten = d_zero
         mo_atm%uten = d_zero
