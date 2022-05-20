@@ -281,15 +281,14 @@ module mod_regcm_interface
   end subroutine RCM_finalize
 
   subroutine setup_openacc(mpi_rank)
-    use openacc, only: acc_device_nvidia, acc_get_num_devices, acc_set_device_num
+    use openacc, only: acc_device_default, acc_get_device_type, acc_get_num_devices, acc_set_device_num
     implicit none
     integer, intent(in) :: mpi_rank
     integer :: idev, ndev
 
-    ndev = acc_get_num_devices(acc_device_nvidia)
+    ndev = acc_get_num_devices(acc_device_default)
     idev = mod(mpi_rank, ndev)
-    call acc_set_device_num(idev, acc_device_nvidia)
-!    call acc_set_device_num(0, acc_device_nvidia)
+    call acc_set_device_num(idev, acc_get_device_type())
   end subroutine setup_openacc
 
 end module mod_regcm_interface
