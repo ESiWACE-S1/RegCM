@@ -525,7 +525,7 @@ module mod_moloch
 
     !jday = yeardayfrac(rcmtimer%idate)
 !$acc update device(zeta)
-!$acc parallel present(zeta, tvirt, ps, p)
+!$acc parallel present(zeta, tvirt, ps, p) private(zdgz, lrt, tv)
 !$acc loop collapse(2)
     do i = ice1 , ice2
       do j = jce1 , jce2
@@ -839,7 +839,7 @@ module mod_moloch
           vd(:,:,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
 !$acc end kernels
 
-!$acc parallel present(u, hx, v, hy, w)
+!$acc parallel present(u, hx, v, hy, w) private(zuh, zvh)
 !$acc loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -860,7 +860,7 @@ module mod_moloch
 
           ! Equation 10, generalized vertical velocity
 
-!$acc parallel present(u, hx, v, hy, s, gzitak)
+!$acc parallel present(u, hx, v, hy, s, gzitak) private(zuh, zvh)
 !$acc loop collapse(3)
           do k = kz , 2 , -1
             do i = ici1 , ici2
@@ -879,7 +879,7 @@ module mod_moloch
           ! Equation 16
 
           if ( lrotllr ) then
-!$acc parallel present(fmz, u, v, rmv, zdiv2, mx)
+!$acc parallel present(fmz, u, v, rmv, zdiv2, mx) private(zum, zup, zvm, zvp)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -898,7 +898,7 @@ module mod_moloch
             end do
 !$acc end parallel
           else
-!$acc parallel present(fmz, u, rmu, v, rmv, zdiv2, mx2)
+!$acc parallel present(fmz, u, rmu, v, rmv, zdiv2, mx2) private(zum, zup, zvm, zvp, zrfmzum, zrfmzvm, zrfmzup, zrfmzvp)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -937,7 +937,7 @@ module mod_moloch
 !$acc end parallel
           ! new w (implicit scheme) from Equation 19
           do k = kz , 2 , -1
-!$acc parallel present(deltaw, w, fmzf, tetav, qv, qsat, t, pai, zdiv2, fmz, ffilt, wwkw)
+!$acc parallel present(deltaw, w, fmzf, tetav, qv, qsat, t, pai, zdiv2, fmz, ffilt, wwkw) private(zrom1w, zqs, zdth, zwexpl, zu, zd, zrapp)
 !$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -1044,7 +1044,7 @@ module mod_moloch
 !$acc update device(pai, deltaw)
 
           if ( lrotllr ) then
-!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1065,7 +1065,7 @@ module mod_moloch
             end do
 !$acc end parallel
             zcy = zdtrdy
-!$acc parallel present(deltaw, tetav, corv, ud, v, hy, gzitakh, pai)
+!$acc parallel present(deltaw, tetav, corv, ud, v, hy, gzitakh, pai) private(zfz, zrom1v, zcor1v)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
@@ -1087,7 +1087,7 @@ module mod_moloch
 
           else
 
-!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1108,7 +1108,7 @@ module mod_moloch
             end do
 !$acc end parallel
 
-!$acc parallel present(mv, deltaw, tetav, corv, ud, v, hy, gzitakh, pai)
+!$acc parallel present(mv, deltaw, tetav, corv, ud, v, hy, gzitakh, pai) private(zcy, zfz, zrom1v, zcor1v)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = idi1 , idi2
@@ -1220,6 +1220,35 @@ module mod_moloch
         rdeno = (t1-t2)/sign(max(abs(zzden),minden),zzden)
       end function rdeno
 
+      pure real(rkx) function get_zphi(j, i, k, pp, s, kmax, zdtrdz)
+!$acc routine seq
+        implicit none
+        integer(ik4), intent(in) :: j , i , k, kmax
+        real(rkx), intent(in) :: zdtrdz
+        real(rkx) , dimension(:,:,:) , pointer , intent(in) :: pp, s
+        integer(ik4) :: k1, k1p1
+        real(rkx) :: zamu , r , b  , is
+
+        real(rkx) , parameter :: wlow  = 0.0_rkx
+        real(rkx) , parameter :: whigh = 2.0_rkx
+
+        zamu = s(j,i,k) * zdtrdz
+        if ( zamu >= d_zero ) then
+          is = d_one
+          k1 = k
+          k1p1 = k1 + 1
+          if ( k1p1 > kmax ) k1p1 = kmax
+        else
+          is = -d_one
+          k1 = k - 2
+          k1p1 = k - 1
+          if ( k1 < 1 ) k1 = 1
+        end if
+        r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k-1),pp(j,i,k))
+        b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+        get_zphi = is + zamu * b - is * b
+      end function get_zphi
+
 ! Fully device-resident: make sure all IO is on the GPU before calling wafone
       subroutine wafone(pp,dta)
         implicit none
@@ -1231,6 +1260,7 @@ module mod_moloch
         real(rkx) :: zrfmn , zrfmw , zrfme , zrfms
         real(rkx) :: zdtrdx , zdtrdy , zdtrdz
         real(rkx) :: zhxvtn , zhxvts , zcostx
+        real(rkx) :: wfwk, wfwkp1
 
         real(rkx) , parameter :: wlow  = 0.0_rkx
         real(rkx) , parameter :: whigh = 2.0_rkx
@@ -1243,14 +1273,14 @@ module mod_moloch
         end if
 
         ! Vertical advection
-!$acc parallel present(wfw)
+!$acc parallel present(wfw) private(j)
         do j = jci1 , jci2
           wfw(j,1) = d_zero
           wfw(j,kzp1) = d_zero
         end do
 !$acc end parallel
 
-!$acc parallel present(wfw, pp, s, fmzf, fmz, wz)
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, zrfmu, zrfmd)
 !$acc loop seq
         do i = ici1 , ici2
 !$acc loop vector collapse(2)
@@ -1296,7 +1326,7 @@ module mod_moloch
 !$acc end parallel
 
         if ( do_vadvtwice ) then
-!$acc parallel present(fmzf, wz, wfw, s, fmz)
+!$acc parallel present(fmzf, wz, wfw, s, fmz) private(zamu, is, k1, k1p1, r, b, zphi, zrfmd, zrfmu, zdv)
           do i = ici1 , ici2
 !$acc loop vector collapse(2)
             do k = 1 , kzm1
@@ -1376,7 +1406,7 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz)
+!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz) private(zamu, is, ih, ihm1, r, b, zphi, zhxvtn, zhxvts, zrfmn, zrfms, zdv)
 !$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1452,7 +1482,7 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc parallel present(fmz, pp, mu, zpbw, u, p0)
+!$acc parallel present(fmz, pp, mu, zpbw, u, p0) private(zamu, is, jh, jhm1, r, b, zphi, zcostx, zrfme, zrfmw, zdv)
 !$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1503,7 +1533,7 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0)
+!$acc parallel present(rmv, pp, v, zpby, fmz, wz, mx2, p0) private(zamu, is, ih, ihm1, r, b, zphi, zrfmn, zrfms, zdv)
 !$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
@@ -1577,7 +1607,7 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz)
+!$acc parallel present(rmu, pp, mx2, zpbw, u, p0, fmz) private(zamu, is, jh, jhm1, r, b, zphi, zrfme, zrfmw, zdv)
 !$acc loop seq
           do k = 1 , kz
 !$acc loop vector collapse(2)
