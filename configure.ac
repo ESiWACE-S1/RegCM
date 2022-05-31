@@ -585,11 +585,11 @@ if eval "test x$DEBUG = x1"; then
     AC_SUBST(NOOPTFC)
   fi
   if test -z "$COMPILER_PGI_TRUE"; then
-    FCFLAGS="-Mbounds -Mcache_align -Mchkfpstk -Mchkstk -Mdalign -Mdclchk \
-             -Mdepchk -Miomutex -Mrecursive -Msave -Ktrap=divz -O0 -g \
+    FCFLAGS="-Mbounds -Mcache_align -Mchkstk -Mdalign \
+             -Miomutex -Mrecursive -Ktrap=divz -O0 -g \
              -gopt -traceback $FCFLAGS"
     if test "test x$USE_OPENACC = x1"; then
-      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
     fi
     NOOPTFC="$FCFLAGS"
     AC_SUBST(FCFLAGS)
@@ -661,8 +661,8 @@ else
     NOOPTFC="-O1 $FCFLAGS"
     FCFLAGS="-O3 -fast -fastsse $FCFLAGS"
     if eval "test x"$USE_OPENACC" = x1"; then
-      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH -Minfo=accel"
-      NOOPTFC="$NOOPTFC -acc=gpu -gpu=$PGI_GPU_ARCH -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
     fi
     if eval "test x"$USE_OPENACC" = x2"; then
       FCFLAGS="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"
