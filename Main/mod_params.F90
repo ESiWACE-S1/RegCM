@@ -68,7 +68,7 @@ module mod_params
     implicit none
     real(rkx) :: afracl , afracs , bb , cc , dlargc , dsmalc , dxtemc , &
                qk , qkp1 , sig700 , ssum , vqmax , wk , wkp1 , xbot ,   &
-               xtop , xx , yy , mo_c1 , mo_c2 , dl
+               xtop , xx , yy , mo_c1 , mo_c2 , dl , minfrq
     real(rkx) , dimension(kzp1) :: fak , fbk
     integer(ik4) :: kbmax
     integer(ik4) :: iretval
@@ -147,8 +147,9 @@ module mod_params
       entrpen_ocn , entrscv , entrmid , cprcon , detrpen_lnd ,       &
       detrpen_ocn , entshalp , rcuc_lnd , rcuc_ocn , rcpec_lnd ,     &
       rcpec_ocn , rhebc_lnd , rhebc_ocn , rprc_ocn , rprc_lnd ,      &
-      cmtcape , lmfpen , lmfmid , lmfdd , lepcld , lmfdudv ,         &
-      lmfscv , lmfuvdis , lmftrac , lmfsmooth , lmfwstar
+      revap_lnd , revap_ocn , cmtcape , lmfpen , lmfmid , lmfdd ,    &
+      lepcld , lmfdudv , lmfscv , lmfuvdis , lmftrac , lmfsmooth ,   &
+      lmfwstar
 
     namelist /kfparam/ kf_min_pef , kf_max_pef , kf_entrate , kf_dpp , &
       kf_min_dtcape , kf_max_dtcape , kf_tkemax , kf_convrate ,        &
@@ -453,6 +454,8 @@ module mod_params
                             ! cloud at which evaporation starts for ocean
     rprc_lnd = 1.4e-3_rkx   ! coefficient for conversion from cloud water
     rprc_ocn = 1.4e-3_rkx   ! coefficient for conversion from cloud water
+    revap_lnd = 1.0e-5_rkx  ! coefficient for evaporation over land
+    revap_ocn = 1.0e-5_rkx  ! coefficient for evaporation over ocean
     cmtcape = 3600.0_rkx   ! CAPE adjustment timescale
     lmfpen    = .true.  ! penetrative conv is switched on
     lmfmid    = .true.  ! midlevel conv is switched on
@@ -999,6 +1002,22 @@ module mod_params
 
       dt = check_against_outparams(dt,mindt)
 
+      minfrq = 86400.0_rkx
+      if ( ifsrf  ) minfrq = min(minfrq,srffrq*3600.0_rkx)
+      if ( ifatm  ) minfrq = min(minfrq,atmfrq*3600.0_rkx)
+      if ( ifrad  ) minfrq = min(minfrq,radfrq*3600.0_rkx)
+      if ( ifopt  ) minfrq = min(minfrq,optfrq*3600.0_rkx)
+      if ( ifshf  ) minfrq = min(minfrq,3600.0_rkx)
+      if ( ichem == 1 ) then
+        if ( ifchem ) minfrq = min(minfrq,chemfrq*3600.0_rkx)
+      end if
+      if ( lakemod == 1 ) then
+        if ( iflak ) minfrq = min(minfrq,lakfrq*3600.0_rkx)
+      end if
+      if ( nsg > 1 ) then
+        if ( ifsub ) minfrq = min(minfrq,subfrq*3600.0_rkx)
+      end if
+
       if ( dtsrf <= 0.0_rkx ) dtsrf = 600.0_rkx
       if ( dtcum <= 0.0_rkx ) dtcum = 300.0_rkx
       if ( dtche <= 0.0_rkx ) dtche = 900.0_rkx
@@ -1020,31 +1039,25 @@ module mod_params
       if ( dtabem < dt ) dtabem = dt
 
       dtsrf = int(dtsrf / dt) * dt
-      if ( ifshf ) then
-        do while ( mod(3600.0_rkx,dtsrf) > d_zero )
-          dtsrf = dtsrf - dt
-        end do
-      else
-        do while ( mod(86400.0_rkx,dtsrf) > d_zero )
-          dtsrf = dtsrf - dt
-        end do
-      end if
-      dtsrf = int(dtsrf / dt) * dt
+      do while ( mod(minfrq,dtsrf) > d_zero )
+        dtsrf = dtsrf - dt
+      end do
 
       dtcum = int(dtcum / dt) * dt
-      do while ( mod(86400.0_rkx,dtcum) > d_zero )
+      do while ( mod(minfrq,dtcum) > d_zero )
         dtcum = dtcum - dt
       end do
-      dtcum = int(dtcum / dt) * dt
+      dtcum = max(int(dtcum / (0.5_rkx*dtsrf)),1) * (0.5_rkx*dtsrf)
 
       dtrad = int(dtrad / dt) * dt
-      do while ( mod(86400.0_rkx,dtrad) > d_zero )
+      do while ( mod(minfrq,dtrad) > d_zero )
         dtrad = dtrad - dt
       end do
-      dtrad = int(dtrad / dt) * dt
+      dtrad = max(int(dtrad / (d_two*dtsrf)),1) * (d_two*dtsrf)
+
+      dtabem = max(int(dtabem / (36_rkx*dtrad)),1) * (36.0_rkx*dtrad)
 
       dtche = int(dtche / dt) * dt
-      dtabem = int(dtabem / dtrad) * dtrad
 
       if ( iseaice == 1 ) then
         select case (ssttyp)
@@ -1472,6 +1485,8 @@ module mod_params
       call bcast(rhebc_ocn)
       call bcast(rprc_lnd)
       call bcast(rprc_ocn)
+      call bcast(revap_lnd)
+      call bcast(revap_ocn)
       call bcast(cmtcape)
       call bcast(lmfpen)
       call bcast(lmfmid)
@@ -1645,7 +1660,11 @@ module mod_params
     ! Calculate the time step in minutes.
     !
     dtsec = dt
-    dtbat = dt
+    if ( idynamic == 3 ) then
+      dtbat = dtsrf
+    else
+      dtbat = dt
+    end if
     rdt   = d_one/dt
     dtbdys = real(ibdyfrq,rkx)*secph
     !
@@ -1678,8 +1697,8 @@ module mod_params
     if ( ichem == 1 ) then
       alarm_out_che => rcm_alarm(rcmtimer,secph*chemfrq)
     end if
-      alarm_out_opt => rcm_alarm(rcmtimer,secph*optfrq)
-      if ( nsg > 1 ) then
+    alarm_out_opt => rcm_alarm(rcmtimer,secph*optfrq)
+    if ( nsg > 1 ) then
       alarm_out_sub => rcm_alarm(rcmtimer,secph*subfrq)
     end if
 
@@ -1698,8 +1717,6 @@ module mod_params
     if ( iocncpl == 1 .or. iwavcpl == 1 .or. icopcpl == 1 ) then
       syncro_cpl => rcm_syncro(rcmtimer,cpldt)
     end if
-
-    rsrffrq_sec = d_one/(srffrq*secph)
 
     if ( idynamic == 1 ) then
       do ns = 1 , nsplit
@@ -2482,7 +2499,6 @@ module mod_params
         write(stdout,'(a,f12.6)') &
           '  CAPE adjustment timescale         : ',cmtcape
       end if
-      cevapu = cevaplnd
     end if
     if ( any(icup == 6)  ) then
       if ( myid == italk ) then

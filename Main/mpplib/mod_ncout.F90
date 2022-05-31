@@ -3297,6 +3297,10 @@ module mod_ncout
             call outstream_addatt(outstream(i)%ncout(j), &
               ncattribute_real8('tiedtke_cloud_water_conv_over_ocean',rprc_ocn))
             call outstream_addatt(outstream(i)%ncout(j), &
+              ncattribute_real8('tiedtke_evap_coeff_over_land',revap_lnd))
+            call outstream_addatt(outstream(i)%ncout(j), &
+              ncattribute_real8('tiedtke_evap_coeff_over_ocean',revap_ocn))
+            call outstream_addatt(outstream(i)%ncout(j), &
               ncattribute_real8('tiedtke_cape_adjustment_timescale',cmtcape))
           else
             call outstream_addatt(outstream(i)%ncout(j), &
@@ -3951,6 +3955,8 @@ module mod_ncout
             cycle
         end select
       end if
+
+      call outstream_sync(outstream(istream)%ncout(jfile))
 
     end do
 

@@ -624,7 +624,6 @@ module mod_moloch
         end if
       end if
     end if
-
     !
     ! Next timestep ready : increment elapsed forecast time
     !
