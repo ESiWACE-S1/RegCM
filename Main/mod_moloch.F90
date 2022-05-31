@@ -202,9 +202,9 @@ module mod_moloch
     call assignpnt(mddom%msfx,mx)
 !$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
-!$acc enter data create(hx)
+!$acc enter data create(hx(jde1ga:jde2ga,ice1:ice2))
     call assignpnt(mddom%hy,hy)
-!$acc enter data create(hy)
+!$acc enter data create(hy(jce1:jce2,ide1ga:ide2ga))
     call assignpnt(mddom%xlat,xlat)
     call assignpnt(mddom%xlon,xlon)
     call assignpnt(mddom%ht,ht)
@@ -219,15 +219,15 @@ module mod_moloch
     call assignpnt(mo_atm%tetav,tetav)
 !$acc enter data create(tetav)
     call assignpnt(mo_atm%u,u)
-!$acc enter data create(u)
+!$acc enter data create(u(jde1gb:jde2gb,ice1ga:ice2ga,1:kz))
     call assignpnt(mo_atm%ux,ux)
 !$acc enter data create(ux)
     call assignpnt(mo_atm%v,v)
-!$acc enter data create(v)
+!$acc enter data create(v(jce1ga:jce2ga,ide1gb:ide2gb,1:kz))
     call assignpnt(mo_atm%vx,vx)
 !$acc enter data create(vx)
     call assignpnt(mo_atm%w,w)
-!$acc enter data create(w)
+!$acc enter data create(w(jce1:jce2,ice1:ice2,1:kzp1))
     call assignpnt(mo_atm%tvirt,tvirt)
 !$acc enter data create(tvirt)
     call assignpnt(mo_atm%zeta,zeta)
@@ -834,12 +834,7 @@ module mod_moloch
           call exchange(v,1,jce1,jce2,ide1,ide2,1,kz)
 !$acc update device(u, v)
 
-!$acc kernels present(ud, u, vd, v)
-          ud(:,:,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
-          vd(:,:,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
-!$acc end kernels
-
-!$acc parallel present(u, hx, v, hy, w) private(zuh, zvh)
+!$acc parallel present(u, v, w, hx, hy) private(zuh, zvh)
 !$acc loop collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -849,6 +844,16 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
+
+!          do i = ici1 , ici2
+!            do j = jci1 , jci2
+!              zuh = u(j,i,kz) * hx(j,i) + u(j+1,i,kz) * hx(j+1,i)
+!              zvh = v(j,i,kz) * hy(j,i) + v(j,i+1,kz) * hy(j,i+1)
+!              w(j,i,kzp1) = d_half * (zuh+zvh)
+!            end do
+!          end do
+!!$acc update device(w)
+
 !$acc parallel present(s, w)
 !$acc loop collapse(2)
           do i = ici1 , ici2
@@ -857,6 +862,11 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
+
+!$acc kernels present(ud, u, vd, v) default(present)
+          ud(jde1ga:jde2ga,ice1ga:ice2ga,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
+          vd(jce1ga:jce2ga,ide1ga:ide2ga,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
+!$acc end kernels
 
           ! Equation 10, generalized vertical velocity
 
@@ -1219,35 +1229,6 @@ module mod_moloch
         zzden = (t3-t4)
         rdeno = (t1-t2)/sign(max(abs(zzden),minden),zzden)
       end function rdeno
-
-      pure real(rkx) function get_zphi(j, i, k, pp, s, kmax, zdtrdz)
-!$acc routine seq
-        implicit none
-        integer(ik4), intent(in) :: j , i , k, kmax
-        real(rkx), intent(in) :: zdtrdz
-        real(rkx) , dimension(:,:,:) , pointer , intent(in) :: pp, s
-        integer(ik4) :: k1, k1p1
-        real(rkx) :: zamu , r , b  , is
-
-        real(rkx) , parameter :: wlow  = 0.0_rkx
-        real(rkx) , parameter :: whigh = 2.0_rkx
-
-        zamu = s(j,i,k) * zdtrdz
-        if ( zamu >= d_zero ) then
-          is = d_one
-          k1 = k
-          k1p1 = k1 + 1
-          if ( k1p1 > kmax ) k1p1 = kmax
-        else
-          is = -d_one
-          k1 = k - 2
-          k1p1 = k - 1
-          if ( k1 < 1 ) k1 = 1
-        end if
-        r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k-1),pp(j,i,k))
-        b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
-        get_zphi = is + zamu * b - is * b
-      end function get_zphi
 
 ! Fully device-resident: make sure all IO is on the GPU before calling wafone
       subroutine wafone(pp,dta)
