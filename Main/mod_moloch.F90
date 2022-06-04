@@ -96,7 +96,7 @@ module mod_moloch
 
   real(rkx) , parameter :: minden = 1.0e-30_rkx
 
-  logical , parameter :: do_phys = .true.
+  logical , parameter :: do_phys = .false.
   logical , parameter :: do_bdy = .true.
   logical , parameter :: do_fulleq = .false.
   logical :: do_filterpai = .false.
@@ -1236,7 +1236,9 @@ module mod_moloch
         real(rkx) , intent(in) :: dta
         integer(ik4) :: j , i , k
         integer(ik4) :: k1 , k1p1 , ih , ihm1 , jh , jhm1
+        integer(ik4) :: k1m1 , k1p1m1
         real(rkx) :: zamu , r , b , zphi , is , zdv , zrfmu , zrfmd
+        real(rkx) :: zamum1 , rm1 , bm1 , zphim1 , ism1
         real(rkx) :: zrfmn , zrfmw , zrfme , zrfms
         real(rkx) :: zdtrdx , zdtrdy , zdtrdz
         real(rkx) :: zhxvtn , zhxvts , zcostx
@@ -1261,56 +1263,11 @@ module mod_moloch
 !$acc end parallel
 
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, zrfmu, zrfmd)
-!$acc loop seq
-        do i = ici1 , ici2
-!$acc loop vector collapse(2)
-          do k = 1 , kzm1
-            do j = jci1 , jci2
-              zamu = s(j,i,k+1) * zdtrdz
-              if ( zamu >= d_zero ) then
-                is = d_one
-                k1 = k + 1
-                k1p1 = k1 + 1
-                if ( k1p1 > kz ) k1p1 = kz
-              else
-                is = -d_one
-                k1 = k - 1
-                k1p1 = k
-                if ( k1 < 1 ) k1 = 1
-              end if
-              r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k),pp(j,i,k+1))
-              b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
-              zphi = is + zamu * b - is * b
-              wfw(j,k+1) = d_half * s(j,i,k+1) * ((d_one+zphi)*pp(j,i,k+1) + &
-                                                  (d_one-zphi)*pp(j,i,k))
-              !wfw(j,k+1) = d_half * zamu * ((d_one+zphi)*pp(j,i,k+1) + &
-              !                              (d_one-zphi)*pp(j,i,k))
-            end do
-          end do
-!$acc loop vector collapse(2)
-          do k = 1 , kz
-            do j = jci1 , jci2
-              zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
-              zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
-              zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * pp(j,i,k)
-              wz(j,i,k) = pp(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
-            end do
-          end do
-          !do k = 1 , kz
-          !  do j = jci1 , jci2
-          !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
-          !    wz(j,i,k) = pp(j,i,k) - wfw(j,k) + wfw(j,k+1) + zdv
-          !  end do
-          !end do
-        end do
-!$acc end parallel
-
-        if ( do_vadvtwice ) then
-!$acc parallel present(fmzf, wz, wfw, s, fmz) private(zamu, is, k1, k1p1, r, b, zphi, zrfmd, zrfmu, zdv)
+!$acc loop collapse(3)
+        do k = 1 , kz
           do i = ici1 , ici2
-!$acc loop vector collapse(2)
-            do k = 1 , kzm1
-              do j = jci1 , jci2
+            do j = jci1 , jci2
+              if(k < kz) then
                 zamu = s(j,i,k+1) * zdtrdz
                 if ( zamu >= d_zero ) then
                   is = d_one
@@ -1323,36 +1280,88 @@ module mod_moloch
                   k1p1 = k
                   if ( k1 < 1 ) k1 = 1
                 end if
-                r = rdeno(wz(j,i,k1),wz(j,i,k1p1),wz(j,i,k),wz(j,i,k+1))
+                r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k),pp(j,i,k+1))
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu * b - is * b
-                wfw(j,k+1) = d_half*s(j,i,k+1) * ((d_one+zphi)*wz(j,i,k+1) + &
-                                                  (d_one-zphi)*wz(j,i,k))
-                !wfw(j,k+1) = d_half * zamu * ((d_one+zphi)*wz(j,i,k+1) + &
-                !                              (d_one-zphi)*wz(j,i,k))
+                wfwkp1 = d_half * s(j,i,k+1) * ((d_one+zphi)*pp(j,i,k+1) + &
+                                                    (d_one-zphi)*pp(j,i,k))
+              else
+                wfwkp1 = d_zero
+              end if
+
+              if(k > 1) then
+                zamum1 = s(j,i,k) * zdtrdz
+                if ( zamum1 >= d_zero ) then
+                  ism1 = d_one
+                  k1m1 = k
+                  k1p1m1 = k1m1 + 1
+                  if ( k1p1m1 > kz ) k1p1m1 = kz
+                else
+                  ism1 = -d_one
+                  k1m1 = k - 2
+                  k1p1m1 = k - 1
+                  if ( k1m1 < 1 ) k1m1 = 1
+                end if
+                rm1 = rdeno(pp(j,i,k1m1),pp(j,i,k1p1m1),pp(j,i,k-1),pp(j,i,k))
+                bm1 = max(wlow, min(whigh, max(rm1, min(d_two*rm1,d_one))))
+                zphim1 = ism1 + zamum1 * bm1 - ism1 * bm1
+                wfwk = d_half * s(j,i,k) * ((d_one+zphim1)*pp(j,i,k) + &
+                                                    (d_one-zphim1)*pp(j,i,k-1))
+              else
+                wfwk = d_zero
+              end if
+
+              zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
+              zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
+              zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * pp(j,i,k)
+              wz(j,i,k) = pp(j,i,k) - wfwk * zrfmu + wfwkp1 * zrfmd + zdv
+            end do
+          end do
+        end do
+!$acc end parallel
+
+        if ( do_vadvtwice ) then
+!$acc parallel present(wz, wwkw, s) private(zamu, is, k1, k1p1, r, b, zphi, zrfmd, zrfmu, zdv)
+!$acc loop vector collapse(3)
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                if(k == 1) then
+                  wwkw(j,i,k) = d_zero
+                else
+                  zamu = s(j,i,k) * zdtrdz
+                  if ( zamu >= d_zero ) then
+                    is = d_one
+                    k1 = k
+                    k1p1 = k1 + 1
+                    if ( k1p1 > kz ) k1p1 = kz
+                  else
+                    is = -d_one
+                    k1 = k - 2
+                    k1p1 = k - 1
+                    if ( k1 < 1 ) k1 = 1
+                  end if
+                  r = rdeno(wz(j,i,k1),wz(j,i,k1p1),wz(j,i,k-1),wz(j,i,k))
+                  b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                  zphi = is + zamu * b - is * b
+                  wwkw(j,i,k) = d_half*s(j,i,k) * ((d_one+zphi)*wz(j,i,k) + &
+                                                    (d_one-zphi)*wz(j,i,k-1))
+                end if
               end do
             end do
-!$acc loop vector
-            do j = jci1 , jci2
-              zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
-              zdv = -s(j,i,2) * zrfmd * wz(j,i,1)
-              wz(j,i,1) = wz(j,i,1) + wfw(j,2) * zrfmd + zdv
-            end do
-!$acc loop vector collapse(2)
-            do k = 2 , kz
+          end do
+!$acc end parallel
+!$acc parallel present(fmzf, wz, wwkw, s, fmz) private(zrfmd, zrfmu, zdv)
+!$acc loop vector collapse(3)
+          do k = 1 , kz
+            do i = ici1 , ici2
               do j = jci1 , jci2
                 zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
                 zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
                 zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * wz(j,i,k)
-                wz(j,i,k) = wz(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
+                wz(j,i, k) = wz(j,i,k) - wwkw(j,i,k)*zrfmu + wwkw(j,i,k+1)*zrfmd + zdv
               end do
             end do
-            !do k = 1 , kz
-            !  do j = jci1 , jci2
-            !    zdv = (s(j,i,k) - s(j,i,k+1)) * zdtrdz * pp(j,i,k)
-            !    wz(j,i,k) = pp(j,i,k) - wfw(j,k) + wfw(j,k+1) + zdv
-            !  end do
-            !end do
           end do
 !$acc end parallel
         end if
