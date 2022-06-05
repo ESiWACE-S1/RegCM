@@ -716,21 +716,22 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
-!$acc parallel present(zdiv2, p2d)
-!$acc loop gang
+!$acc parallel present(zdiv2, wwkw)
+!$acc loop vector collapse(3)
         do k = 1 , kz
-!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
-              p2d(j,i) = 0.125_rkx * (zdiv2(j-1,i,k) + zdiv2(j+1,i,k) + &
+              wwkw(j,i,k) = 0.125_rkx * (zdiv2(j-1,i,k) + zdiv2(j+1,i,k) + &
                                       zdiv2(j,i-1,k) + zdiv2(j,i+1,k)) - &
-                         d_half   * zdiv2(j,i,k)
+                                      d_half   * zdiv2(j,i,k)
             end do
           end do
-!$acc loop vector collapse(2)
+        end do
+!$acc loop vector collapse(3)
+        do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              zdiv2(j,i,k) = zdiv2(j,i,k) + mo_anu2 * p2d(j,i)
+              zdiv2(j,i,k) = zdiv2(j,i,k) + mo_anu2 * wwkw(j,i,k)
             end do
           end do
         end do
@@ -871,7 +872,7 @@ module mod_moloch
 
 !$acc parallel present(u, hx, v, hy, s, gzitak) private(zuh, zvh)
 !$acc loop collapse(3)
-          do k = kz , 2 , -1
+          do k = 2, kz
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zuh = (u(j,i,k)   + u(j,i,k-1))   * hx(j,i) + &
@@ -945,12 +946,13 @@ module mod_moloch
           end do
 !$acc end parallel
           ! new w (implicit scheme) from Equation 19
-          do k = kz , 2 , -1
 !$acc parallel present(deltaw, w, fmzf, tetav, qv, qsat, t, pai, zdiv2, fmz, ffilt, wwkw) private(zrom1w, zqs, zdth, zwexpl, zu, zd, zrapp)
 !$acc loop collapse(2)
-            do i = ici1 , ici2
-              do j = jci1 , jci2
-                deltaw(j,i,k) = -w(j,i,k)
+          do i = ici1 , ici2
+            do j = jci1 , jci2
+!$acc loop seq
+              do k = kz , 2 , -1
+                  deltaw(j,i,k) = -w(j,i,k)
                 ! explicit w:
                 !    it must be consistent with the initialization of pai
                 zrom1w = d_half * cpd * fmzf(j,i,k) * &
@@ -982,19 +984,20 @@ module mod_moloch
                 wwkw(j,i,k) = zrapp * zu
               end do
             end do
-!$acc end parallel
           end do
-          do k = 2 , kz
+!$acc end parallel
 !$acc parallel present(w, wwkw, deltaw)
 !$acc loop collapse(2)
-            do i = ici1 , ici2
-              do j = jci1 , jci2
+          do i = ici1 , ici2
+            do j = jci1 , jci2
+!$acc loop seq
+              do k = 2 , kz
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
                 deltaw(j,i,k) = deltaw(j,i,k) + w(j,i,k)
               end do
             end do
-!$acc end parallel
           end do
+!$acc end parallel
 
           ! new Exner function (Equation 19)
 !$acc parallel present(zdiv2, fmz, w)
