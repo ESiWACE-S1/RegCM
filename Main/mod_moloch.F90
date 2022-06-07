@@ -717,7 +717,7 @@ module mod_moloch
         integer(ik4) :: j , i , k
 
 !$acc parallel present(zdiv2, wwkw)
-!$acc loop vector collapse(3)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -727,7 +727,7 @@ module mod_moloch
             end do
           end do
         end do
-!$acc loop vector collapse(3)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -746,7 +746,6 @@ module mod_moloch
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(pai)
 
-!$acc update device(p2d)
 !$acc parallel present(p2d, pai)
 !$acc loop gang
         do k = 1 , kz
@@ -766,7 +765,6 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc update self(p2d, pai)
       end subroutine filtpai
 
       subroutine filttheta
@@ -777,7 +775,6 @@ module mod_moloch
         call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
 !$acc update device(tetav)
 
-!$acc update device(p2d)
 !$acc parallel present(p2d, tetav)
 !$acc loop gang
         do k = 1 , kz
@@ -797,7 +794,6 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc update self(p2d, tetav)
       end subroutine filttheta
 
       subroutine sound(dts)
@@ -829,10 +825,10 @@ module mod_moloch
 
           ! partial definition of the generalized vertical velocity
 
-!$acc update self(u, v)
+!$acc update self(u,v)
           call exchange(u,1,jde1,jde2,ice1,ice2,1,kz)
           call exchange(v,1,jce1,jce2,ide1,ide2,1,kz)
-!$acc update device(u, v)
+!$acc update device(u,v)
 
 !$acc parallel present(u, v, w, hx, hy) private(zuh, zvh)
 !$acc loop collapse(2)
@@ -852,7 +848,6 @@ module mod_moloch
 !              w(j,i,kzp1) = d_half * (zuh+zvh)
 !            end do
 !          end do
-!!$acc update device(w)
 
 !$acc parallel present(s, w)
 !$acc loop collapse(2)
