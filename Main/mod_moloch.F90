@@ -1225,9 +1225,11 @@ module mod_moloch
 
         ! Compute W (and TKE if required) on zita levels
 
+!$acc update device(w)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
+!$acc update device(tke)
           call wstagtox(tke,tkex)
         end if
 
