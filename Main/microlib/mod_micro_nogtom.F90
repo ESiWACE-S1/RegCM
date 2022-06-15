@@ -58,9 +58,17 @@ module mod_micro_nogtom
   use mod_stdio
   use mod_mpmessage
   use mod_memutil
-  use mod_regcm_types
-  use mod_constants
   use mod_service
+  use mod_regcm_types
+  use mod_constants , only : d_zero , d_one , d_half , d_two , d_1000
+  use mod_constants , only : dlowval , mathpi
+  use mod_constants , only : tzero , rtice , rtwat_rtice_r
+  use mod_constants , only : c5alvcp , c5alscp , rhoh2o , rovcp
+  use mod_constants , only : wlhfocp , wlhsocp , wlhvocp
+  use mod_constants , only : rwat , wlhs , wlhv
+  use mod_constants , only : c5les , c5ies , c3ies , c3les , c4les , c4ies
+  use mod_constants , only : c2es , ep1
+  use mod_constants , only : egrav , regrav , ep1
   use mod_runparams , only : nqx
   use mod_runparams , only : iqqv => iqv !vapor
   use mod_runparams , only : iqql => iqc !liquid
@@ -230,7 +238,7 @@ module mod_micro_nogtom
   integer(ik4) , pointer , dimension(:) :: indx
   real(rkx) , pointer , dimension(:) :: vv
 
-  real(rkx) , parameter :: activqx = 1.0e-16_rkx
+  real(rkx) , parameter :: activqx = 1.0e-12_rkx
   real(rkx) , parameter :: zerocf = 0.0001_rkx
   real(rkx) , parameter :: onecf  = 0.9999_rkx
 
@@ -901,6 +909,23 @@ module mod_micro_nogtom
               end do
             end if
 
+            !------------------------------------------------
+            ! Evaporate very small amounts of liquid and ice
+            !------------------------------------------------
+
+            if ( qx0(iqql) < activqx ) then
+              qsexp(iqqv,iqql) = qsexp(iqqv,iqql) + qx0(iqql)
+              qsexp(iqql,iqqv) = qsexp(iqql,iqqv) - qx0(iqql)
+              qxfg(iqql) = qxfg(iqql) - qx0(iqql)
+              qxfg(iqqv) = qxfg(iqqv) + qx0(iqql)
+            end if
+            if ( qx0(iqqi) < activqx ) then
+              qsexp(iqqv,iqqi) = qsexp(iqqv,iqqi) + qx0(iqqi)
+              qsexp(iqqi,iqqv) = qsexp(iqqi,iqqv) - qx0(iqqi)
+              qxfg(iqqi) = qxfg(iqqi) - qx0(iqqi)
+              qxfg(iqqv) = qxfg(iqqv) + qx0(iqqi)
+            end if
+
             !------------------------------------------------------------------
             !  SEDIMENTATION/FALLING OF *ALL* MICROPHYSICAL SPECIES
             !
@@ -925,9 +950,9 @@ module mod_micro_nogtom
               end if  !lfall
             end do ! n
 
-            !-----------..........--------------------------------------------
+            !-----------------------------------------------------------------
             !  ICE SUPERSATURATION ADJUSTMENT
-            !-..........------------------------------------------------------
+            !-----------------------------------------------------------------
             ! Note that the supersaturation adjustment is made with respect to
             ! liquid saturation:  when T > 0C
             ! ice saturation:     when T < 0C
@@ -1299,7 +1324,7 @@ module mod_micro_nogtom
             ! By considering sedimentation first and including the
             ! implicit loss term in the first guess of ice.
             !--------------------------------------------------------------
-            lactiv = qxfg(iqql) > activqx .and. ltklt0
+            lactiv = qx0(iqql) > activqx .and. ltklt0
             if ( lactiv ) then
               vpice = eeice(j,i,k) !saturation vapor pressure wrt ice
               vpliq = eeliq(j,i,k) !saturation vapor pressure wrt liq
@@ -1521,7 +1546,7 @@ module mod_micro_nogtom
             ! calculate sublimation latent heat
 
             chngmax = max((tzero-tk)*rldcp,d_zero)
-            if ( chngmax > d_zero .and. qxfg(iqqr) > activqx ) then
+            if ( chngmax > d_zero .and. qx0(iqqr) > activqx ) then
               chng = min(qxfg(iqqr),chngmax)
               chng = max(chng,d_zero)
               qsexp(iqqs,iqqr) = qsexp(iqqs,iqqr) + chng
@@ -1540,7 +1565,7 @@ module mod_micro_nogtom
             !-------------------
 
             chngmax = max((thomo-tk)*rldcp,d_zero)
-            if ( chngmax > d_zero .and. qxfg(iqql) > activqx ) then
+            if ( chngmax > d_zero .and. qx0(iqql) > activqx ) then
               chng = min(qxfg(iqql),chngmax)
               chng = max(chng,d_zero)
               qsexp(iqqi,iqql) = qsexp(iqqi,iqql) + chng
@@ -1584,7 +1609,7 @@ module mod_micro_nogtom
             lactiv = covpclr(j,i) > d_zero .and. &
                      covptot(j,i) > d_zero .and. &
                      qpretot > d_zero .and.      &
-                     qxfg(iqqr) > activqx .and.  &
+                     qx0(iqqr) > activqx .and.   &
                      qe < zrh*qsliq(j,i,k)
             if ( lactiv ) then
               ! note: units of preclr and qpretot differ
@@ -1642,7 +1667,7 @@ module mod_micro_nogtom
             lactiv = covpclr(j,i) > d_zero .and. &
                      covptot(j,i) > d_zero .and. &
                      qpretot > d_zero .and.      &
-                     qxfg(iqqs) > activqx .and.  &
+                     qx0(iqqs) > activqx .and.   &
                      qe < zrh*qsice(j,i,k)
             if ( lactiv ) then
               ! note: units of preclr and qpretot differ

@@ -97,6 +97,7 @@ module mod_regcm_interface
 
     call whoami(myid)
     call setup_mesg(myid)
+    call setup_openacc(myid)
 
 #ifdef DEBUG
     call activate_debug()
@@ -231,7 +232,7 @@ module mod_regcm_interface
       extime = extime + real(dtsec,rk8)
       if ( debug_level > 3 ) then
         if ( myid == italk ) then
-          write(6,'(a,a,f12.2)') 'Simulation time: ', rcmtimer%str( ), extime
+          write(6,'(a,a,f12.2)') 'Simulation time: ', rcmtimer%str( )
         end if
       end if
 
@@ -278,6 +279,17 @@ module mod_regcm_interface
       write(stdout,*) 'RegCM V4 simulation successfully reached end'
     end if
   end subroutine RCM_finalize
+
+  subroutine setup_openacc(mpi_rank)
+    use openacc, only: acc_device_default, acc_get_device_type, acc_get_num_devices, acc_set_device_num
+    implicit none
+    integer, intent(in) :: mpi_rank
+    integer :: idev, ndev
+
+    ndev = acc_get_num_devices(acc_device_default)
+    idev = mod(mpi_rank, ndev)
+    call acc_set_device_num(idev, acc_get_device_type())
+  end subroutine setup_openacc
 
 end module mod_regcm_interface
 ! vim: tabstop=8 expandtab shiftwidth=2 softtabstop=2

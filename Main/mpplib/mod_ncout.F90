@@ -687,6 +687,7 @@ module mod_ncout
             call setup_var(v3dvar_atm,atm_w,vsize,'wa','m s-1', &
               'Vertical Component of Wind','upward_wind',.true.)
             atm_w_out => v3dvar_atm(atm_w)%rval
+!$acc enter data create(atm_w_out)
           end if
           if ( enable_atm3d_vars(atm_pp) ) then
             call setup_var(v3dvar_atm,atm_pp,vsize,'ppa','Pa', &
@@ -701,6 +702,7 @@ module mod_ncout
             call setup_var(v3dvar_atm,atm_w,vsize,'wa','m s-1', &
               'Vertical Component of Wind','upward_wind',.true.)
             atm_w_out => v3dvar_atm(atm_w)%rval
+!$acc enter data create(atm_w_out)
           end if
           if ( enable_atm3d_vars(atm_pai) ) then
             call setup_var(v3dvar_atm,atm_pai,vsize,'pai','1', &
@@ -3295,6 +3297,10 @@ module mod_ncout
             call outstream_addatt(outstream(i)%ncout(j), &
               ncattribute_real8('tiedtke_cloud_water_conv_over_ocean',rprc_ocn))
             call outstream_addatt(outstream(i)%ncout(j), &
+              ncattribute_real8('tiedtke_evap_coeff_over_land',revap_lnd))
+            call outstream_addatt(outstream(i)%ncout(j), &
+              ncattribute_real8('tiedtke_evap_coeff_over_ocean',revap_ocn))
+            call outstream_addatt(outstream(i)%ncout(j), &
               ncattribute_real8('tiedtke_cape_adjustment_timescale',cmtcape))
           else
             call outstream_addatt(outstream(i)%ncout(j), &
@@ -3949,6 +3955,8 @@ module mod_ncout
             cycle
         end select
       end if
+
+      call outstream_sync(outstream(istream)%ncout(jfile))
 
     end do
 

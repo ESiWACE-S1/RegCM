@@ -108,11 +108,7 @@ module mod_runparams
   ! Step counters to activate surface and radiation schemes
   real(rkx) , public :: rnsrf_for_srffrq , rnsrf_for_day , &
      rnsrf_for_lakfrq , rnsrf_for_subfrq , rnrad_for_optfrq , &
-     rnrad_for_srffrq , rnrad_for_radfrq
-  ! Step of surface scheme in one atmosphere I/O interval
-  real(rkx) , public :: rnsrf_for_atmfrq
-  ! One over seconds in one surface I/O interval
-  real(rkx) , public :: rsrffrq_sec
+     rnrad_for_srffrq , rnrad_for_radfrq , rnsrf_for_atmfrq
   ! Model base timestep in seconds
   real(rkx) , public :: dtsec
   !
@@ -341,6 +337,8 @@ module mod_runparams
                                   ! cloud at which evaporation starts for ocean
   real(rkx) , public :: rprc_lnd  ! coeff for conversion from cloud water
   real(rkx) , public :: rprc_ocn  ! coeff for conversion from cloud water
+  real(rkx) , public :: revap_lnd ! coeff evaporation over land
+  real(rkx) , public :: revap_ocn ! coeff evaporation over ocean
   real(rkx) , public :: detrpen_lnd ! Detrainment rate for penetrative conv
   real(rkx) , public :: detrpen_ocn ! Detrainment rate for penetrative conv
   real(rkx) , public :: entshalp  ! shallow entrainment factor for entrorg
@@ -544,7 +542,7 @@ module mod_runparams
       call getmem1d(zita,1,kzp1,'mod_runparams:zita')
       call getmem1d(zitah,1,kz,'mod_runparams:zitah')
       call getmem1d(ffilt,1,kz,'mod_runparams:ffilt')
-!!$acc enter data create(ffilt)
+!$acc enter data create(ffilt)
       call getmem1d(ak,1,kz,'mod_runparams:ak')
       call getmem1d(bk,1,kz,'mod_runparams:bk')
     end if
