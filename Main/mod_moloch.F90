@@ -911,10 +911,11 @@ module mod_moloch
           end do
 !$acc end parallel
 
-!$acc kernels present(ud, u, vd, v) default(present)
+! DANGER
+! Parallelizing the following two lines causes a crash with managed memory
           ud(jde1ga:jde2ga,ice1ga:ice2ga,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
           vd(jce1ga:jce2ga,ide1ga:ide2ga,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
-!$acc end kernels
+! /DANGER
 
           ! Equation 10, generalized vertical velocity
 
