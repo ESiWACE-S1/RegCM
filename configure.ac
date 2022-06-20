@@ -143,6 +143,16 @@ if eval "test x"$USE_OPENACC" = x2"; then
   AC_SUBST(AM_CPPFLAGS)
 fi
 
+AC_ARG_ENABLE(openacc-managed,
+  AC_HELP_STRING([--enable-openacc-managed],
+                 [Compile OpenACC directives with managed memory (only for PGI fortran compilation)]),
+                 [USE_OPENACC="3"]
+)
+if eval "test x"$USE_OPENACC" = x3"; then
+  AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
+  AC_SUBST(AM_CPPFLAGS)
+fi
+
 USE_PROF="0"
 AC_ARG_ENABLE(profile,
   AC_HELP_STRING([--enable-profile],
@@ -591,6 +601,9 @@ if eval "test x$DEBUG = x1"; then
     if test "test x$USE_OPENACC = x1"; then
       FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
     fi
+    if test "test x$USE_OPENACC = x3"; then
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,managed,lineinfo -Minfo=accel"
+    fi
     NOOPTFC="$FCFLAGS"
     AC_SUBST(FCFLAGS)
     AC_SUBST(NOOPTFC)
@@ -667,6 +680,10 @@ else
     if eval "test x"$USE_OPENACC" = x2"; then
       FCFLAGS="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"
       NOOPTFC="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"
+    fi
+    if eval "test x"$USE_OPENACC" = x3"; then
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,managed,lineinfo -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc=gpu -gpu=$PGI_GPU_ARCH,managed,lineinfo -Minfo=accel"
     fi
     AC_SUBST(FCFLAGS)
     AC_SUBST(NOOPTFC)
