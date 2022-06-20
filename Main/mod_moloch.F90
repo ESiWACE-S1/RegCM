@@ -413,12 +413,16 @@ module mod_moloch
 !$acc end parallel
 
     if ( idiag > 0 ) then
+!$acc kernels present(t, qv, ten0, qen0)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
+!$acc end kernels
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
+!$acc kernels present(trac, chiten0)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+!$acc end kernels
       end if
     end if
 
