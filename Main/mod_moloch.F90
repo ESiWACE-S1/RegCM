@@ -1265,8 +1265,10 @@ module mod_moloch
         call xtouvstag(ux,vx,u,v)
 
         ! Back to half-levels
+!$acc update device(wx)
         call xtowstag(wx,w)
         if ( ibltyp == 2 ) then
+!$acc update device(tkex)
           call xtowstag(tkex,tke)
         end if
       end subroutine advection
