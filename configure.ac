@@ -589,7 +589,7 @@ if eval "test x$DEBUG = x1"; then
              -Miomutex -Mrecursive -Ktrap=divz -O0 -g \
              -gopt -traceback $FCFLAGS"
     if test "test x$USE_OPENACC = x1"; then
-      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
     fi
     NOOPTFC="$FCFLAGS"
     AC_SUBST(FCFLAGS)
@@ -661,8 +661,8 @@ else
     NOOPTFC="-O1 $FCFLAGS"
     FCFLAGS="-O3 -fast -fastsse $FCFLAGS"
     if eval "test x"$USE_OPENACC" = x1"; then
-      FCFLAGS="$FCFLAGS -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
-      NOOPTFC="$NOOPTFC -acc -ta=tesla:$PGI_GPU_ARCH,lineinfo -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
     fi
     if eval "test x"$USE_OPENACC" = x2"; then
       FCFLAGS="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"

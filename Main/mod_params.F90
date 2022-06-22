@@ -115,8 +115,7 @@ module mod_params
 
     namelist /nonhydroparam/ ifupr , nhbet , nhxkd ,       &
       ifrayd , rayndamp , rayalpha0 , rayhd , itopnudge ,  &
-      mo_anu2 , mo_filterpai , mo_nadv , mo_nsound ,       &
-      mo_wmax , mo_nzfilt
+      mo_anu2 , mo_nadv , mo_nsound , mo_wmax , mo_nzfilt
 
     namelist /rrtmparam/ inflgsw , iceflgsw , liqflgsw , inflglw ,    &
       iceflglw , liqflglw , icld , irng , imcica , nradfo
@@ -303,10 +302,9 @@ module mod_params
     rayhd = 10000.0_rkx
     mo_wmax = 150.0_rkx
     mo_nadv = 3
-    mo_nsound = 6
-    mo_anu2 = 0.6_rkx
+    mo_nsound = 5
+    mo_anu2 = 0.05_rkx
     mo_nzfilt = 0
-    mo_filterpai = .false.
     !
     ! Rrtm radiation param ;
     !
@@ -1003,19 +1001,29 @@ module mod_params
       dt = check_against_outparams(dt,mindt)
 
       minfrq = 86400.0_rkx
-      if ( ifsrf  ) minfrq = min(minfrq,srffrq*3600.0_rkx)
-      if ( ifatm  ) minfrq = min(minfrq,atmfrq*3600.0_rkx)
-      if ( ifrad  ) minfrq = min(minfrq,radfrq*3600.0_rkx)
-      if ( ifopt  ) minfrq = min(minfrq,optfrq*3600.0_rkx)
-      if ( ifshf  ) minfrq = min(minfrq,3600.0_rkx)
+
+      ! Check user input
+      if ( srffrq <= 0.0_rkx ) srffrq = 3.0_rkx
+      if ( atmfrq <= 0.0_rkx ) atmfrq = 6.0_rkx
+      if ( radfrq <= 0.0_rkx ) radfrq = 6.0_rkx
+      if ( optfrq <= 0.0_rkx ) optfrq = 6.0_rkx
+      if ( lakfrq <= 0.0_rkx ) lakfrq = 6.0_rkx
+      if ( subfrq <= 0.0_rkx ) subfrq = 3.0_rkx
+      if ( chemfrq <= 0.0_rkx ) chemfrq = 6.0_rkx
+
+      if ( ifsrf ) minfrq = min(minfrq,max(srffrq*3600.0_rkx,dt))
+      if ( ifatm ) minfrq = min(minfrq,max(atmfrq*3600.0_rkx,dt))
+      if ( ifrad ) minfrq = min(minfrq,max(radfrq*3600.0_rkx,dt))
+      if ( ifopt ) minfrq = min(minfrq,max(optfrq*3600.0_rkx,dt))
+      if ( ifshf ) minfrq = min(minfrq,3600.0_rkx)
       if ( ichem == 1 ) then
-        if ( ifchem ) minfrq = min(minfrq,chemfrq*3600.0_rkx)
+        if ( ifchem ) minfrq = min(minfrq,max(chemfrq*3600.0_rkx,dt))
       end if
       if ( lakemod == 1 ) then
-        if ( iflak ) minfrq = min(minfrq,lakfrq*3600.0_rkx)
+        if ( iflak ) minfrq = min(minfrq,max(lakfrq*3600.0_rkx,dt))
       end if
       if ( nsg > 1 ) then
-        if ( ifsub ) minfrq = min(minfrq,subfrq*3600.0_rkx)
+        if ( ifsub ) minfrq = min(minfrq,max(subfrq*3600.0_rkx,dt))
       end if
 
       if ( dtsrf <= 0.0_rkx ) dtsrf = 600.0_rkx
@@ -1053,7 +1061,7 @@ module mod_params
       do while ( mod(minfrq,dtrad) > d_zero )
         dtrad = dtrad - dt
       end do
-      dtrad = max(int(dtrad / (d_two*dtsrf)),1) * (d_two*dtsrf)
+      dtrad = max(int(dtrad / (3.0_rkx*dtsrf)),1) * (3.0_rkx*dtsrf)
 
       dtabem = max(int(dtabem / (36_rkx*dtrad)),1) * (36.0_rkx*dtrad)
 
@@ -1190,7 +1198,6 @@ module mod_params
       call bcast(mo_nzfilt)
       call bcast(mo_nadv)
       call bcast(mo_nsound)
-      call bcast(mo_filterpai)
       call bcast(ifrayd)
       call bcast(rayndamp)
       call bcast(rayalpha0)
@@ -1800,7 +1807,6 @@ module mod_params
     end if
     if ( moloch_do_test_1 ) then
       ifrayd = 0
-      mo_filterpai = .false.
       mddom%ht = 0.0_rkx
       mddom%lndcat = 15.0_rkx
       mddom%lndtex = 14.0_rkx
@@ -2149,7 +2155,7 @@ module mod_params
     call init_radiation
     if ( islab_ocean == 1 ) then
       call allocate_mod_slabocean
-      call init_slabocean(sfs,mddom%lndcat,fsw,flw)
+      call init_slabocean(sfs,mddom%lndcat,fsw,flw,mddom%xlon,mddom%xlat)
     end if
     !
     ! Setup Boundary condition routines.
@@ -2164,7 +2170,7 @@ module mod_params
       call compute_moloch_static
     end if
 
-    if ( iboudy < 0 .or. iboudy > 5 ) then
+    if ( iboudy < 0 .or. iboudy > 6 ) then
       call fatal(__FILE__,__LINE__, &
                  'UNSUPPORTED BDY SCHEME.')
     end if
@@ -2534,7 +2540,7 @@ module mod_params
     dsmalc = 10.0_rkx
     dxtemc = min(max(ds,dsmalc),dlargc)
     clfrcv = afracl + (afracs-afracl)*((dlargc-dxtemc)/(dlargc-dsmalc))**2
-    clfrcv = min(clfrcv,d_one)
+    clfrcv = min(clfrcv,afracs)
     clfrcv = max(clfrcv,afracl)
     if ( myid == italk ) then
       write(stdout,*) &
@@ -2625,6 +2631,8 @@ module mod_params
         write(stdout,*) 'Sponge boundary conditions are used.'
       else if ( iboudy == 5 ) then
         write(stdout,*) 'Relaxation boundary conditions (exponential method)'
+      else if ( iboudy == 6 ) then
+        write(stdout,*) 'Relaxation boundary conditions (sinusoidal method)'
       end if
 
       if ( idynamic /= 3 ) then
