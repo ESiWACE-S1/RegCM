@@ -96,7 +96,7 @@ module mod_moloch
 
   real(rkx) , parameter :: minden = 1.0e-30_rkx
 
-  logical , parameter :: do_phys = .true.
+  logical , parameter :: do_phys = .false.
   logical , parameter :: do_bdy = .true.
   logical , parameter :: do_fulleq = .false.
   logical :: do_filterpai = .false.
@@ -268,8 +268,8 @@ module mod_moloch
         call assignpnt(mo_atm%trac,trac)
 !$acc enter data create(trac)
     end if
-    if ( ifrayd == 1 ) then
 !$acc update device(zeta)
+    if ( ifrayd == 1 ) then
         call xtoustag(zeta,zetau)
         call xtovstag(zeta,zetav)
 !$acc update self(zetau, zetav)
@@ -291,6 +291,8 @@ module mod_moloch
     ddamp = 0.2_rkx
 ! Update static arrays on device
 !$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv)
+!! Update dynamic arrays on device
+!!$acc update device(u, v, w, pai, t, qx)
   end subroutine init_moloch
 
   !
@@ -524,7 +526,6 @@ module mod_moloch
 !$acc end parallel
 
     !jday = yeardayfrac(rcmtimer%idate)
-!$acc update device(zeta)
 !$acc parallel present(zeta, tvirt, ps, p) private(zdgz, lrt, tv)
 !$acc loop collapse(2)
     do i = ice1 , ice2
@@ -741,10 +742,11 @@ module mod_moloch
       subroutine filtpai
         implicit none
         integer(ik4) :: j , i , k
-
-!$acc update self(pai)
+        on_device = .true.
+!!$acc update self(pai)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(pai)
+!!$acc update device(pai)
+        on_device = .false.
 
 !$acc parallel present(p2d, pai)
 !$acc loop gang
@@ -771,9 +773,11 @@ module mod_moloch
         implicit none
         integer(ik4) :: j , i , k
 
-!$acc update self(tetav)
+        on_device = .true.
+!!$acc update self(tetav)
         call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(tetav)
+!!$acc update device(tetav)
+        on_device = .false.
 
 !$acc parallel present(p2d, tetav)
 !$acc loop gang
@@ -814,21 +818,22 @@ module mod_moloch
         zcs2 = zdtrdz**2*rdrcv
 
         !  sound waves
+        on_device = .true.
 
         if ( .not. do_fulleq ) then
-!$acc update self(tetav)
+!!$acc update self(tetav)
           call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(tetav)
+!!$acc update device(tetav)
         end if
+
         
         do jsound = 1 , nsound
 
           ! partial definition of the generalized vertical velocity
-
-!$acc update self(u,v)
+!!$acc update self(u,v)
           call exchange(u,1,jde1,jde2,ice1,ice2,1,kz)
           call exchange(v,1,jce1,jce2,ide1,ide2,1,kz)
-!$acc update device(u,v)
+!!$acc update device(u,v)
 
 !$acc parallel present(u, v, w, hx, hy) private(zuh, zvh)
 !$acc loop collapse(2)
@@ -922,9 +927,9 @@ module mod_moloch
             end do
 !$acc end parallel
           end if
-!$acc update self(zdiv2)
+!!$acc update self(zdiv2)
           call exchange_lrbt(zdiv2,1,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(zdiv2)
+!!$acc update device(zdiv2)
           call divdamp(dtsound)
           if ( do_filterdiv ) then
             call filt3d
@@ -1027,9 +1032,9 @@ module mod_moloch
                 end do
               end do
 !$acc end parallel
-!$acc update self(tetav)
+!!$acc update self(tetav)
               call exchange_lrbt(tetav,1,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(tetav)
+!!$acc update device(tetav)
             end if
           end if
 
@@ -1045,10 +1050,10 @@ module mod_moloch
           end do
 !$acc end parallel
 
-!$acc update self(pai, deltaw)
+!!$acc update self(pai, deltaw)
           call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
           call exchange_lrbt(deltaw,1,jce1,jce2,ice1,ice2,1,kzp1)
-!$acc update device(pai, deltaw)
+!!$acc update device(pai, deltaw)
 
           if ( lrotllr ) then
 !$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
@@ -1166,6 +1171,7 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
+        on_device = .false.
       end subroutine sound
 
       subroutine advection(dta)
@@ -1244,6 +1250,8 @@ module mod_moloch
 
         real(rkx) , parameter :: wlow  = 0.0_rkx
         real(rkx) , parameter :: whigh = 2.0_rkx
+
+!        on_device = .true.
 
         zdtrdx = dta/dx
         zdtrdy = dta/dx
@@ -1385,9 +1393,11 @@ module mod_moloch
 !$acc end parallel
         end if
 
-!$acc update self(wz)
+        on_device = .true.
+!!$acc update self(wz)
         call exchange_bt(wz,2,jci1,jci2,ice1,ice2,1,kz)
-!$acc update device(wz)
+!!$acc update device(wz)
+        on_device = .false.
 
         if ( lrotllr ) then
 
@@ -1463,9 +1473,11 @@ module mod_moloch
 !$acc end parallel
           end if
 
-!$acc update self(p0)
+          on_device = .true.
+!!$acc update self(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
-!$acc update device(p0)
+!!$acc update device(p0)
+          on_device = .false.
 
           ! Zonal advection
 
@@ -1588,9 +1600,11 @@ module mod_moloch
 !$acc end parallel
           end if
 
-!$acc update self(p0)
+          on_device = .true.
+!!$acc update self(p0)
           call exchange_lr(p0,2,jce1,jce2,ici1,ici2,1,kz)
-!$acc update device(p0)
+!!$acc update device(p0)
+          on_device = .false.
 
           ! Zonal advection
 
@@ -1641,7 +1655,7 @@ module mod_moloch
           end do
 !$acc end parallel
         end if
-
+!        on_device = .false.
       end subroutine wafone
 
       subroutine reset_tendencies
@@ -2069,10 +2083,12 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: u , v
     integer(ik4) :: i , j , k
 
-!$acc update self(ux, vx)
+    on_device = .true.
+!!$acc update self(ux, vx)
     call exchange_lr(ux,2,jce1,jce2,ice1,ice2,1,kz)
     call exchange_bt(vx,2,jce1,jce2,ice1,ice2,1,kz)
-!$acc update device(ux, vx)
+!!$acc update device(ux, vx)
+    on_device = .false.
 
     ! Back to wind points: U (fourth order)
 !$acc parallel present(u, ux)
@@ -2148,10 +2164,12 @@ module mod_moloch
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
-!$acc update self(u, v)
+    on_device = .true.
+!!$acc update self(u, v)
     call exchange_lr(u,2,jde1,jde2,ice1,ice2,1,kz)
     call exchange_bt(v,2,jce1,jce2,ide1,ide2,1,kz)
-!$acc update device(u, v)
+!!$acc update device(u, v)
+    on_device = .false.
 
     ! Compute U-wind on T points
 !$acc parallel present(ux, u)
@@ -2218,6 +2236,7 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
+!on_device = .false.
   end subroutine uvstagtox
 
 ! Fully device-resident: make sure all IO is on the GPU for this subroutine
