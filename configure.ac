@@ -140,6 +140,8 @@ AC_ARG_ENABLE(openacc-debug,
 )
 if eval "test x"$USE_OPENACC" = x2"; then
   AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
+  AC_SUBST(AM_CPPFLAGS)
+fi
 
 USE_SKL="0"
 AC_ARG_ENABLE(skl,
