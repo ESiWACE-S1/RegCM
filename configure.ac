@@ -86,14 +86,14 @@ if eval "test x"$USE_KNL" = x1"; then
   AC_SUBST(AM_CPPFLAGS)
 fi
 
-USE_SKL="0"
-AC_ARG_ENABLE(skl,
-  AC_HELP_STRING([--enable-skl],
-                 [Compile with Sky Lake flags.]),
-                 [USE_SKL="1"]
+USE_ZEN3="0"
+AC_ARG_ENABLE(zen3,
+  AC_HELP_STRING([--enable-zen3],
+                 [Compile with Zen3 processor optimization]),
+                 [USE_ZEN3="1"]
 )
-if eval "test x"$USE_SKL" = x1"; then
-  AM_CPPFLAGS="\$(DEFINE)SKL $AM_CPPFLAGS"
+if eval "test x"$USE_ZEN3" = x1"; then
+  AM_CPPFLAGS="\$(DEFINE)ZEN3 $AM_CPPFLAGS"
   AC_SUBST(AM_CPPFLAGS)
 fi
 
@@ -140,6 +140,15 @@ AC_ARG_ENABLE(openacc-debug,
 )
 if eval "test x"$USE_OPENACC" = x2"; then
   AM_CPPFLAGS="\$(DEFINE)OPENACC $AM_CPPFLAGS"
+
+USE_SKL="0"
+AC_ARG_ENABLE(skl,
+  AC_HELP_STRING([--enable-skl],
+                 [Compile with Sky Lake flags.]),
+                 [USE_SKL="1"]
+)
+if eval "test x"$USE_SKL" = x1"; then
+  AM_CPPFLAGS="\$(DEFINE)SKL $AM_CPPFLAGS"
   AC_SUBST(AM_CPPFLAGS)
 fi
 
@@ -472,6 +481,10 @@ if test -z "$COMPILER_GNU_TRUE"; then
     FCFLAGS="$FCFLAGS -march=knl"
     AC_SUBST(FCFLAGS)
   fi
+  if eval "test x"$USE_ZEN3" = x1"; then
+    FCFLAGS="$FCFLAGS -march=znver3"
+    AC_SUBST(FCFLAGS)
+  fi
   if eval "test x"$USE_SKL" = x1"; then
     FCFLAGS="$FCFLAGS -march=skylake-avx512"
     AC_SUBST(FCFLAGS)
@@ -501,6 +514,10 @@ if test -z "$COMPILER_INTEL_TRUE"; then
   AC_SUBST(LIBS)
   if eval "test x"$USE_KNL" = x1"; then
     FCFLAGS="$FCFLAGS -xMIC-AVX512"
+    AC_SUBST(FCFLAGS)
+  fi
+  if eval "test x"$USE_ZEN3" = x1"; then
+    FCFLAGS="$FCFLAGS -axCORE-AVX2"
     AC_SUBST(FCFLAGS)
   fi
   if eval "test x"$USE_SKL" = x1"; then
@@ -736,8 +753,8 @@ AC_SUBST(SYSLIBS)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile external/Makefile Share/Makefile PreProc/Makefile \
-                 PreProc/Terrain/Makefile PreProc/ICBC/Makefile \
-                 PreProc/CH_EMISSIONS/Makefile \
+                 PreProc/Terrain/Makefile PreProc/ICBC/cmip6/Makefile \
+                 PreProc/ICBC/Makefile PreProc/CH_EMISSIONS/Makefile \
                  PreProc/CH_EMISSIONS/interpolation/Makefile \
                  PreProc/CH_EMISSIONS/interpolation/tools/Makefile \
                  PreProc/CH_EMISSIONS/interpolation/tools/REGCM_grid/Makefile \
