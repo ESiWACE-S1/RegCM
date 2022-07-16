@@ -534,7 +534,6 @@ module mod_moloch
 
     if ( idiag > 0 ) then
 !$acc wait(2)
-!$acc update self(t, qv)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
     end if
