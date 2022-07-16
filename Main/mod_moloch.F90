@@ -239,7 +239,6 @@ module mod_moloch
     call assignpnt(mo_atm%rho,rho)
 !$acc enter data create(rho)
     call assignpnt(mo_atm%qx,qx)
-!$acc enter data create(qx)
     call assignpnt(mo_atm%qs,qsat)
 !$acc enter data create(qsat)
     call assignpnt(mo_atm%qx,qv,iqv)
@@ -251,6 +250,7 @@ module mod_moloch
         call assignpnt(mo_atm%qx,qi,iqi)
         call assignpnt(mo_atm%qx,qr,iqr)
         call assignpnt(mo_atm%qx,qs,iqs)
+!$acc enter data create(qi,qr,qs)
       end if
     end if
     if ( ibltyp == 2 ) then
@@ -284,8 +284,6 @@ module mod_moloch
     ddamp = 0.2_rkx
 ! Update static arrays on device
 !$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv)
-!! Update dynamic arrays on device
-!!$acc update device(u, v, w, pai, t, qx)
   end subroutine init_moloch
 
   !
@@ -310,11 +308,18 @@ module mod_moloch
     dtsound = dtstepa / real(nsound,rkx)
     iconvec = 0
 
-!$acc update device(u, v, w, pai, t, qx)
+! Start of accelerated section
+
+!$acc update device(pai, t, qv) async(2)
+!$acc update device(qc) async(2) if(ipptls > 0)
+!$acc update device(qi, qr, qs) async(2) if(ipptls > 1)
+
     on_device = .true.
     
     call reset_tendencies
 
+!$acc wait(2)
+!$acc update device(u, v) async(2)
 !$acc parallel present(p, pai, qsat, t)
 !$acc loop collapse(3)
     do k = 1 , kz
@@ -354,7 +359,6 @@ module mod_moloch
 !$acc end parallel
         end if
       else
-!$acc update device(qv, qc)
 !$acc parallel present(tvirt, t, qv, qc)
 !$acc loop collapse(3)
         do k = 1 , kz
@@ -438,6 +442,7 @@ module mod_moloch
       end if
     end if
 
+!$acc wait(2)
     do jadv = 1 , nadv
 
       call sound(dtsound)
@@ -445,6 +450,12 @@ module mod_moloch
       call advection(dtstepa)
 
     end do ! Advection loop
+
+!$acc update self(u, v, w, t, qv) async(2)
+!$acc update self(qc) async(2) if(ipptls > 0)
+!$acc update self(qi, qr, qs) async(2) if(ipptls > 1)
+!$acc update self(tke) async(2) if(ibltyp == 2)
+!$acc update self(trac) async(2) if(ichem == 1)
 
     if ( do_filterpai ) then
 !$acc kernels present(pai, pf)
@@ -455,6 +466,8 @@ module mod_moloch
       pai(jce1:jce2,ice1:ice2,:) = pai(jce1:jce2,ice1:ice2,:) + pf
 !$acc end kernels
     end if
+!$acc update self(pai) async(2)
+
     if ( do_fulleq ) then
       if ( do_filtertheta ) then
 !$acc kernels present(tetav, tf)
@@ -466,6 +479,7 @@ module mod_moloch
 !$acc end kernels
       end if
     end if
+!$acc update self(tetav) async(2)
 
 !$acc parallel present(tvirt, tetav, pai)
 !$acc loop collapse(3)
@@ -477,6 +491,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(tvirt) async(2)
 
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
@@ -515,7 +530,10 @@ module mod_moloch
       end do
 !$acc end parallel
     end if
+!$acc update self(t) async(2)
+
     if ( idiag > 0 ) then
+!$acc wait(2)
 !$acc update self(t, qv)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
@@ -523,7 +541,6 @@ module mod_moloch
 
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
-!$acc update self(trac)
         cadvhdiag = (trac(jci1:jci2,ici1:ici2,:,:) - chiten0) * rdt
       end if
     end if
@@ -538,6 +555,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(p, rho) async(2)
 
     !jday = yeardayfrac(rcmtimer%idate)
 !$acc parallel present(zeta, tvirt, ps, p) private(zdgz, lrt, tv)
@@ -553,6 +571,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(ps) async(2)
     !
     ! Recompute saturation
     !
@@ -566,12 +585,11 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
+!$acc update self(qsat) async(2)
 
-!$acc update self(u, v, w, t, pai, tetav, ps, p, rho, qx)
-!$acc update self(tke) if(ibltyp == 2)
-!$acc update self(trac) if(ichem == 1)
+!$acc wait(2)
+! End of accelerated section
     on_device = .false.
-
     !
     ! Lateral/damping boundary condition
     !
@@ -658,7 +676,6 @@ module mod_moloch
 
       subroutine boundary
         implicit none
-
         call exchange_lrbt(ps,1,jce1,jce2,ice1,ice2)
         call exchange_lrbt(u,1,jde1,jde2,ice1,ice2,1,kz)
         call exchange_lrbt(v,1,jce1,jce2,ide1,ide2,1,kz)
@@ -723,9 +740,7 @@ module mod_moloch
             cbdydiag = trac(jci1:jci2,ici1:ici2,:,:) - chiten0
           end if
         end if
-!$acc update device(u,v)
         call uvstagtox(u,v,ux,vx)
-!$acc update self(ux,vx)
         if ( do_filterqx .and. ipptls > 0 ) then
           call exchange_lrbt(qx,1,jce1,jce2,ice1,ice2,1,kz,iqfrst,iqlst)
           call filt4d(qx,mo_anu2,iqfrst,iqlst)
@@ -913,6 +928,7 @@ module mod_moloch
 
 !$acc parallel present(u, hx, v, hy, s, gzitak) private(zuh, zvh)
 !$acc loop collapse(3)
+!!$acc loop  tile(4,8,8)
           do k = 2, kz
             do i = ici1 , ici2
               do j = jci1 , jci2
