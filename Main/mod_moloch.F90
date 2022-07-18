@@ -754,8 +754,11 @@ module mod_moloch
         integer(ik4) , intent(in) :: n1 , n2
         integer(ik4) :: j , i , k , n
 
+!$acc parallel present(p2d, p)
+!$acc loop collapse(2)
         do n = n1 , n2
           do k = 1 , kz
+!$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 p2d(j,i) = 0.125_rkx * (p(j-1,i,k,n) + p(j+1,i,k,n) + &
@@ -763,6 +766,7 @@ module mod_moloch
                            d_half   * p(j,i,k,n)
               end do
             end do
+!$acc loop collapse(2)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 p(j,i,k,n) = p(j,i,k,n) + nu * p2d(j,i)
@@ -770,6 +774,7 @@ module mod_moloch
             end do
           end do
         end do
+!$acc end parallel
       end subroutine filt4d
 
       subroutine filt3d(p,nu)
@@ -1238,9 +1243,11 @@ module mod_moloch
 
         ! Compute W (and TKE if required) on zita levels
 
+!$acc update device(w)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
+!$acc update device(tke)
           call wstagtox(tke,tkex)
         end if
 
