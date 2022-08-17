@@ -164,7 +164,6 @@ module mod_atm_interface
   real(rkx) , public , pointer , dimension(:,:,:) :: drydepflx
 
   ! Coupling
-  real(rkx) , public , pointer , dimension(:,:,:) :: dailyrnf
   integer(ik4) , public , pointer , dimension(:,:) :: cplmsk
 
   integer(ik4) :: ix1 , ix2 , jx1 , jx2
@@ -820,6 +819,7 @@ module mod_atm_interface
       call getmem2d(dom%dlat,jde1,jde2,ide1,ide2,'storage:dlat')
       call getmem2d(dom%dlon,jde1,jde2,ide1,ide2,'storage:dlon')
       call getmem2d(dom%mask,jde1,jde2,ide1,ide2,'storage:mask')
+      call getmem2d(dom%area,jde1,jde2,ide1,ide2,'storage:area')
       if ( idynamic == 3 ) then
         call getmem2d(dom%msfx,jde1,jde2,ide1,ide2,'storage:msfx')
         call getmem2d(dom%msfu,jde1ga,jde2ga,ide1,ide2,'storage:msfu')
@@ -869,7 +869,8 @@ module mod_atm_interface
       call getmem3d(sub%lndtex,1,nnsg,jde1,jde2,ide1,ide2,'storage:lndtex')
       call getmem3d(sub%xlat,1,nnsg,jde1,jde2,ide1,ide2,'storage:xlat')
       call getmem3d(sub%xlon,1,nnsg,jde1,jde2,ide1,ide2,'storage:xlon')
-      call getmem3d(sub%mask,1,nnsg,jde1,jde2,ide1,ide2,'storage:xlon')
+      call getmem3d(sub%mask,1,nnsg,jde1,jde2,ide1,ide2,'storage:mask')
+      call getmem3d(sub%area,1,nnsg,jde1,jde2,ide1,ide2,'storage:area')
       call getmem3d(sub%ldmsk,1,nnsg,jci1,jci2,ici1,ici2,'storage:ldmsk')
       call getmem3d(sub%iveg,1,nnsg,jci1,jci2,ici1,ici2,'storage:iveg')
       call getmem3d(sub%itex,1,nnsg,jci1,jci2,ici1,ici2,'storage:itex')
@@ -902,6 +903,10 @@ module mod_atm_interface
       call getmem2d(sfs%tgbb,jci1,jci2,ici1,ici2,'surf:tgbb')
       call getmem2d(sfs%uvdrag,jci1,jci2,ici1,ici2,'surf:uvdrag')
       call getmem2d(sfs%zo,jci1,jci2,ici1,ici2,'surf:zo')
+      if ( iocncpl == 1 .or. iwavcpl == 1 ) then
+        call getmem2d(sfs%dsrnof,jci1,jci2,ici1,ici2,'surf:dsrnof')
+        call getmem2d(sfs%dtrnof,jci1,jci2,ici1,ici2,'surf:dtrnof')
+      end if
       call getmem2d(sfs%ram1,jci1,jci2,ici1,ici2,'surf:ram1')
       call getmem2d(sfs%rah1,jci1,jci2,ici1,ici2,'surf:rah1')
       call getmem2d(sfs%br,jci1,jci2,ici1,ici2,'surf:br')
@@ -1095,7 +1100,6 @@ module mod_atm_interface
       if ( iocncpl == 1 .or. iwavcpl == 1 ) then
         call getmem2d(cplmsk,jci1,jci2,ici1,ici2,'storage:cplmsk')
         cplmsk(:,:) = 0
-        call getmem3d(dailyrnf,jci1,jci2,ici1,ici2,1,2,'storage:dailyrnf')
       end if
       call getmem2d(pptnc,jci1,jci2,ici1,ici2,'storage:pptnc')
       call getmem2d(prnca,jci1,jci2,ici1,ici2,'storage:prnca')

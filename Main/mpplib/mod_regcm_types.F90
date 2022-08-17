@@ -67,6 +67,7 @@ module mod_regcm_types
     real(rkx) , pointer , dimension(:,:) :: lndcat
     real(rkx) , pointer , dimension(:,:) :: lndtex
     real(rkx) , pointer , dimension(:,:) :: mask
+    real(rkx) , pointer , dimension(:,:) :: area
     real(rkx) , pointer , dimension(:,:) :: dlat
     real(rkx) , pointer , dimension(:,:) :: dlon
     real(rkx) , pointer , dimension(:,:) :: ulat
@@ -110,6 +111,7 @@ module mod_regcm_types
     real(rkx) , pointer , dimension(:,:,:) :: xlat
     real(rkx) , pointer , dimension(:,:,:) :: xlon
     real(rkx) , pointer , dimension(:,:,:) :: mask
+    real(rkx) , pointer , dimension(:,:,:) :: area
     real(rkx) , pointer , dimension(:,:,:) :: dhlake
     integer(ik4) , pointer , dimension(:,:,:) :: ldmsk
     integer(ik4) , pointer , dimension(:,:,:) :: iveg
@@ -301,6 +303,8 @@ module mod_regcm_types
     real(rkx) , pointer , dimension(:,:) :: vz0         ! MYJ SF layer
     real(rkx) , pointer , dimension(:,:) :: thz0        ! MYJ SF layer
     real(rkx) , pointer , dimension(:,:) :: qz0         ! MYJ SF layer
+    real(rkx) , pointer , dimension(:,:) :: dsrnof      ! Daily srnof coupling
+    real(rkx) , pointer , dimension(:,:) :: dtrnof      ! Daily trnof coupling
   end type surfstate
 
   type slice
@@ -481,7 +485,6 @@ module mod_regcm_types
     real(rkx) , pointer , dimension(:,:) :: sxlai2d
     real(rkx) , pointer , dimension(:,:,:) :: sw_vol
     real(rkx) , pointer , dimension(:,:,:) ::tsoi
-    real(rkx) , pointer , dimension(:,:,:) :: dailyrnf
     real(rkx) , pointer , dimension(:,:) :: xlat        ! mddom%xlat
     real(rkx) , pointer , dimension(:,:) :: xlon        ! mddom%xlon
     real(rkx) , pointer , dimension(:,:) :: lndcat      ! mddom%lndcat
@@ -494,6 +497,7 @@ module mod_regcm_types
     integer(ik4) , pointer , dimension(:,:) :: ldmsk    ! mddom%ldmsk
     real(rkx) , pointer , dimension(:,:,:) :: ht1       ! mdsub%ht
     real(rkx) , pointer , dimension(:,:,:) :: lndcat1   ! mdsub%lndcat
+    real(rkx) , pointer , dimension(:,:,:) :: area1     ! mdsub%area
     real(rkx) , pointer , dimension(:,:,:) :: xlat1     ! mdsub%xlat
     real(rkx) , pointer , dimension(:,:,:) :: xlon1     ! mdsub%xlon
     real(rkx) , pointer , dimension(:,:,:) :: dhlake1   ! mdsub%dhlake
@@ -523,6 +527,8 @@ module mod_regcm_types
     real(rkx) , pointer , dimension(:,:) :: u10m        ! sfs%u10m
     real(rkx) , pointer , dimension(:,:) :: v10m        ! sfs%v10m
     real(rkx) , pointer , dimension(:,:) :: q2m         ! sfs%q2m
+    real(rkx) , pointer , dimension(:,:) :: dtrnof      ! sfs%dtrnof
+    real(rkx) , pointer , dimension(:,:) :: dsrnof      ! sfs%dsrnof
     real(rkx) , pointer , dimension(:,:) :: rhox        ! rhox2d
     real(rkx) , pointer , dimension(:,:) :: rswf        ! fsw
     real(rkx) , pointer , dimension(:,:) :: rlwf        ! flw
