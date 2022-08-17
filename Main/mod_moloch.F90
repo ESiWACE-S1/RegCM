@@ -1765,11 +1765,15 @@ module mod_moloch
 #endif
         if ( any(icup > 0) ) then
           if ( idiag > 0 ) then
+!$acc kernels
             ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
             qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+!$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
+!$acc kernels
             chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+!$acc end kernels
           end if
           call cumulus
           if ( ichem == 1 ) then
