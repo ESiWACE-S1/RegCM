@@ -1105,6 +1105,7 @@ module mod_atm_interface
       call getmem2d(prnca,jci1,jci2,ici1,ici2,'storage:prnca')
       call getmem2d(ptrop,jci1,jci2,ici1,ici2,'storage:ptrop')
       call getmem3d(cldfra,jci1,jci2,ici1,ici2,1,kz,'storage:cldfra')
+!$acc enter data create(cldfra)
       call getmem3d(cldlwc,jci1,jci2,ici1,ici2,1,kz,'storage:cldlwc')
       call getmem3d(heatrt,jci1,jci2,ici1,ici2,1,kz,'storage:heatrt')
       call getmem2d(totcf,jci1,jci2,ici1,ici2,'storage:totcf')

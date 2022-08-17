@@ -145,6 +145,7 @@ module mod_che_common
                   1,ntr,'mod_che_common:chifxuw')
     call getmem3d(convcldfra,jci1,jci2,ici1,ici2, &
                   1,kz,'mod_che_common:convcldfra')
+!$acc enter data create(convcldfra)
     call getmem4d(rainout,jci1,jci2,ici1,ici2,1,kz,1,ntr, &
                   'che_common:rainout')
     call getmem4d(washout,jci1,jci2,ici1,ici2,1,kz,1,ntr, &

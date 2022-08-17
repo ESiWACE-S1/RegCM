@@ -1786,18 +1786,24 @@ module mod_moloch
             end if
           end if
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
+!$acc kernels present(chiten0)
             cconvdiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+!$acc end kernels
           end if
         else
           if ( any(icup < 0) ) then
             call shallow_convection
             if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
               tdiag%con = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
               qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc end kernels
             end if
           end if
         end if
@@ -1808,8 +1814,10 @@ module mod_moloch
         !
         if ( ipptls > 0 ) then
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
             qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+!$acc end kernels
           end if
           ! Cumulus clouds
           if ( icldfrac /= 2 ) then
@@ -1818,14 +1826,18 @@ module mod_moloch
           ! Save cumulus cloud fraction for chemistry before it is
           ! overwritten in cldfrac
           if ( ichem == 1 ) then
+!$acc kernels present(convcldfra, cldfra)
             convcldfra(:,:,:) = cldfra(:,:,:)
+!$acc end kernels
           end if
           ! Clouds and large scale precipitation
           call cldfrac(cldlwc,cldfra)
           call microscheme
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             tdiag%lsc = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%lsc = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc end kernels
           end if
         end if
         !
@@ -1893,31 +1905,43 @@ module mod_moloch
         !
         if ( ibltyp > 0 ) then
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
             qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+!$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
+!$acc kernels present(chiten0)
             chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+!$acc end kernels
           end if
           call pblscheme
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             tdiag%tbl = mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%tbl = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
+!$acc kernels present(chiten0)
             ctbldiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+!$acc end kernels
           end if
         end if
         if ( ipptls == 1 ) then
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             ten0 = mo_atm%tten(jci1:jci2,ici1:ici2,:)
             qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+!$acc end kernels
           end if
           call condtq
           if ( idiag > 0 ) then
+!$acc kernels present(ten0, qen0)
             tdiag%lsc = tdiag%lsc + mo_atm%tten(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%lsc = qdiag%lsc + &
                  mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc end kernels
           end if
         end if
         if ( ichem == 1 ) then
