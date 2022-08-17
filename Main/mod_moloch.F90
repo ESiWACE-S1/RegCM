@@ -239,6 +239,7 @@ module mod_moloch
     call assignpnt(mo_atm%rho,rho)
 !$acc enter data create(rho)
     call assignpnt(mo_atm%qx,qx)
+!$acc enter data create(qx)
     call assignpnt(mo_atm%qs,qsat)
 !$acc enter data create(qsat)
     call assignpnt(mo_atm%qx,qv,iqv)
@@ -1959,6 +1960,8 @@ module mod_moloch
         do concurrent ( j = jci1:jci2 , i = idi1:idi2 , k = 1:kz )
           v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
         end do
+!$acc parallel present(qx)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
@@ -1967,6 +1970,9 @@ module mod_moloch
             end do
           end do
         end do
+!$acc end parallel
+!$acc parallel present(qx)
+!$acc loop collapse(4)
         do n = iqfrst , iqlst
           do k = 1 , kz
             do i = ici1 , ici2
@@ -1977,6 +1983,7 @@ module mod_moloch
             end do
           end do
         end do
+!$acc end parallel
         if ( ibltyp == 2 ) then
           do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kzp1 )
             tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
