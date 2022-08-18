@@ -96,7 +96,7 @@ module mod_moloch
 
   real(rkx) , parameter :: minden = 1.0e-30_rkx
 
-  logical , parameter :: do_phys = .false.
+  logical , parameter :: do_phys = .true.
   logical , parameter :: do_bdy = .true.
   logical , parameter :: do_fulleq = .true.
   logical , parameter :: do_filterpai = .false.
