@@ -923,10 +923,17 @@ module mod_moloch
           end do
 !$acc end parallel
 
-!$acc kernels present(ud, u, vd, v) default(present)
-          ud(jde1ga:jde2ga,ice1ga:ice2ga,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
-          vd(jce1ga:jce2ga,ide1ga:ide2ga,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
-!$acc end kernels
+!$acc parallel present(u, v, ud, vd)
+!$acc loop collapse(3)
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                ud(j,i,k) = u(j,i,k)              
+                vd(j,i,k) = v(j,i,k)              
+              end do
+            end do
+          end do
+!$acc end parallel
 
           ! Equation 10, generalized vertical velocity
 
