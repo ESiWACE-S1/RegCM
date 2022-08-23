@@ -1889,9 +1889,17 @@ module mod_moloch
         ! Add radiative transfer package-calculated heating rates to
         ! temperature tendency (deg/sec)
         !
-        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
-          mo_atm%tten(j,i,k) = mo_atm%tten(j,i,k) + heatrt(j,i,k)
+        !do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+!$acc parallel
+!$acc loop collapse(3)
+        do j = jci1 , jci2
+          do i = ici1 , ici2
+            do k = 1 , kz
+              mo_atm%tten(j,i,k) = mo_atm%tten(j,i,k) + heatrt(j,i,k)
+            end do
+          end do
         end do
+!$acc end parallel
         if ( idiag > 0 ) tdiag%rad = heatrt
         !
         !------------------------------------------------
@@ -1958,15 +1966,39 @@ module mod_moloch
         !
         ! Update status
         !
-        do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
-          t(j,i,k) = t(j,i,k) + dtsec * mo_atm%tten(j,i,k)
+        !do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz )
+!$acc parallel
+!$acc loop collapse(3)
+        do j = jci1 , jci2
+          do i = ici1 , ici2
+            do k = 1 , kz
+              t(j,i,k) = t(j,i,k) + dtsec * mo_atm%tten(j,i,k)
+            end do
+          end do
         end do
-        do concurrent ( j = jdi1:jdi2 , i = ici1:ici2 , k = 1:kz )
-          u(j,i,k) = u(j,i,k) + dtsec * mo_atm%uten(j,i,k)
+!$acc end parallel
+        !do concurrent ( j = jdi1:jdi2 , i = ici1:ici2 , k = 1:kz )
+!$acc parallel
+!$acc loop collapse(3)
+        do j = jdi1 , jdi2
+          do i = ici1 , ici2
+            do k = 1 , kz
+              u(j,i,k) = u(j,i,k) + dtsec * mo_atm%uten(j,i,k)
+            end do
+          end do
         end do
-        do concurrent ( j = jci1:jci2 , i = idi1:idi2 , k = 1:kz )
-          v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
+!$acc end parallel
+        !do concurrent ( j = jci1:jci2 , i = idi1:idi2 , k = 1:kz )
+!$acc parallel
+!$acc loop collapse(3)
+        do j = jci1 , jci2
+          do i = idi1 , idi2
+            do k = 1 , kz
+              v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
+            end do
+          end do
         end do
+!$acc end parallel
 !$acc parallel present(qx)
 !$acc loop collapse(3)
         do k = 1 , kz
@@ -1992,15 +2024,33 @@ module mod_moloch
         end do
 !$acc end parallel
         if ( ibltyp == 2 ) then
-          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kzp1 )
-            tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
+          !do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kzp1 )
+!$acc parallel
+!$acc loop collapse(3)
+          do j = jci1 , jci2
+            do i = ici1 , ici2
+              do k = 1 , kzp1
+                tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
+              end do
+            end do
           end do
+!$acc end parallel
         end if
         if ( ichem == 1 ) then
-          do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz , n = 1:ntr )
-            trac(j,i,k,n) = trac(j,i,k,n) + dtsec * mo_atm%chiten(j,i,k,n)
-            trac(j,i,k,n) = max(trac(j,i,k,n),d_zero)
+          !do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz , n = 1:ntr )
+!$acc parallel
+!$acc loop collapse(4)
+          do j = jci , jci2
+            do i = ici1 , ici2
+              do k = 1 , kz
+                do n = 1 , ntr
+                  trac(j,i,k,n) = trac(j,i,k,n) + dtsec * mo_atm%chiten(j,i,k,n)
+                  trac(j,i,k,n) = max(trac(j,i,k,n),d_zero)
+                end do
+              end do
+            end do
           end do
+!$acc end parallel
         end if
 #ifdef DEBUG
         do k = 1 , kz
