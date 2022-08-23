@@ -2040,7 +2040,7 @@ module mod_moloch
           !do concurrent ( j = jci1:jci2 , i = ici1:ici2 , k = 1:kz , n = 1:ntr )
 !$acc parallel
 !$acc loop collapse(4)
-          do j = jci , jci2
+          do j = jci1 , jci2
             do i = ici1 , ici2
               do k = 1 , kz
                 do n = 1 , ntr
