@@ -371,7 +371,7 @@ module mod_moloch
         end do
 !$acc end parallel
         if ( do_fulleq ) then
-!$acc parallel present(t, qwltot, qwitot, qc)
+!$acc parallel present(t, qwltot, qwitot, qc) private(fice)
 !$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
@@ -421,12 +421,16 @@ module mod_moloch
 !$acc end parallel
 
     if ( idiag > 0 ) then
+!$acc kernels present(t, qv, ten0, qen0)
       ten0 = t(jci1:jci2,ici1:ici2,:)
       qen0 = qv(jci1:jci2,ici1:ici2,:)
+!$acc end kernels
     end if
     if ( ichem == 1 ) then
       if ( ichdiag > 0 ) then
+!$acc kernels present(trac, chiten0)
         chiten0 = trac(jci1:jci2,ici1:ici2,:,:)
+!$acc end kernels
       end if
     end if
 
@@ -925,10 +929,11 @@ module mod_moloch
           end do
 !$acc end parallel
 
-!$acc kernels present(ud, u, vd, v) default(present)
+! DANGER
+! Parallelizing the following two lines causes a crash with managed memory
           ud(jde1ga:jde2ga,ice1ga:ice2ga,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
           vd(jce1ga:jce2ga,ide1ga:ide2ga,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
-!$acc end kernels
+! /DANGER
 
           ! Equation 10, generalized vertical velocity
 
@@ -952,7 +957,7 @@ module mod_moloch
           ! Equation 16
 
           if ( lrotllr ) then
-!$acc parallel present(fmz, u, v, rmv, zdiv2, mx) private(zum, zup, zvm, zvp)
+!$acc parallel present(fmz, u, v, rmv, zdiv2, mx) private(zrfmzum, zrfmzvm, zrfmzup, zrfmzvp, zum, zup, zvm, zvp)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1280,8 +1285,10 @@ module mod_moloch
         call xtouvstag(ux,vx,u,v)
 
         ! Back to half-levels
+!$acc update device(wx)
         call xtowstag(wx,w)
         if ( ibltyp == 2 ) then
+!$acc update device(tkex)
           call xtowstag(tkex,tke)
         end if
       end subroutine advection
@@ -1328,7 +1335,7 @@ module mod_moloch
         end do
 !$acc end parallel
 
-!$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, zrfmu, zrfmd)
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, wfwkp1, zamum1, ism1, k1m1, k1p1m1, rm1, bm1, zphim1, wfwk, zrfmu, zrfmd, zdv)
 !$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
@@ -1387,7 +1394,7 @@ module mod_moloch
 !$acc end parallel
 
         if ( do_vadvtwice ) then
-!$acc parallel present(wz, wwkw, s) private(zamu, is, k1, k1p1, r, b, zphi, zrfmd, zrfmu, zdv)
+!$acc parallel present(wz, wwkw, s) private(zamu, is, k1, k1p1, r, b, zphi)
 !$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
