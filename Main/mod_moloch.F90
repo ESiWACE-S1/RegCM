@@ -93,6 +93,7 @@ module mod_moloch
 
   real(rkx) , dimension(:,:,:) , pointer :: tten
   real(rkx) , dimension(:,:,:,:) , pointer :: qxten
+  real(rkx) , dimension(:,:,:,:) , pointer :: chiten
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
@@ -216,7 +217,9 @@ module mod_moloch
     call assignpnt(mo_atm%tten,tten)
 !$acc enter data create(tten)
     call assignpnt(mo_atm%qxten,qxten)
-    !$acc enter data create(qxten)
+!$acc enter data create(qxten)
+    call assignpnt(mo_atm%chiten,chiten)
+!$acc enter data create(chiten)
     call assignpnt(mo_atm%fmz,fmz)
 !$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
@@ -1735,7 +1738,7 @@ module mod_moloch
         mo_atm%uten = d_zero
         mo_atm%vten = d_zero
         if ( ichem == 1 ) then
-          mo_atm%chiten = d_zero
+          chiten = d_zero
         end if
         if ( ibltyp == 2 ) then
           mo_atm%tketen = d_zero
@@ -1788,8 +1791,8 @@ module mod_moloch
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0)
-            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+!$acc kernels present(chiten0, chiten)
+            chiten0 = chiten(jci1:jci2,ici1:ici2,:,:)
 !$acc end kernels
           end if
           call cumulus
@@ -1811,8 +1814,8 @@ module mod_moloch
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0)
-            cconvdiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+!$acc kernels present(chiten0, chiten)
+            cconvdiag = chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
 !$acc end kernels
           end if
         else
@@ -1945,8 +1948,8 @@ module mod_moloch
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0)
-            chiten0 = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:)
+!$acc kernels present(chiten0, chiten)
+            chiten0 = chiten(jci1:jci2,ici1:ici2,:,:)
 !$acc end kernels
           end if
           call pblscheme
@@ -1959,8 +1962,8 @@ module mod_moloch
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0)
-            ctbldiag = mo_atm%chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
+!$acc kernels present(chiten0, chiten)
+            ctbldiag = chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
 !$acc end kernels
           end if
         end if
@@ -2057,13 +2060,13 @@ module mod_moloch
 !$acc end parallel
         end if
         if ( ichem == 1 ) then
-!$acc parallel
+!$acc parallel present(trac, chiten)
 !$acc loop collapse(4)
           do j = jci1 , jci2
             do i = ici1 , ici2
               do k = 1 , kz
                 do n = 1 , ntr
-                  trac(j,i,k,n) = trac(j,i,k,n) + dtsec * mo_atm%chiten(j,i,k,n)
+                  trac(j,i,k,n) = trac(j,i,k,n) + dtsec * chiten(j,i,k,n)
                   trac(j,i,k,n) = max(trac(j,i,k,n),d_zero)
                 end do
               end do
