@@ -92,8 +92,10 @@ module mod_moloch
   real(rkx) , dimension(:,:,:,:) , pointer :: qx , trac
 
   real(rkx) , dimension(:,:,:) , pointer :: tten
+  real(rkx) , dimension(:,:,:) , pointer :: tdiag_con
   real(rkx) , dimension(:,:,:,:) , pointer :: qxten
   real(rkx) , dimension(:,:,:,:) , pointer :: chiten
+  real(rkx) , dimension(:,:,:,:) , pointer :: qdiag_con
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
@@ -216,10 +218,14 @@ module mod_moloch
 !$acc enter data create(ps)
     call assignpnt(mo_atm%tten,tten)
 !$acc enter data create(tten)
+    call assignpnt(tdiag%con,tdiag_con)
+!$acc enter data create(tdiag_con)
     call assignpnt(mo_atm%qxten,qxten)
 !$acc enter data create(qxten)
     call assignpnt(mo_atm%chiten,chiten)
 !$acc enter data create(chiten)
+    call assignpnt(qdiag%con,qdiag_con)
+!$acc enter data create(qdiag_con)
     call assignpnt(mo_atm%fmz,fmz)
 !$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
@@ -294,7 +300,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, tten, qxten)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, tten, qxten, chiten, tdiag_con, qdiag_con)
   end subroutine init_moloch
 
   !
@@ -1806,11 +1812,11 @@ module mod_moloch
             end if
           end if
           if ( idiag > 0 ) then
-!$acc kernels present(ten0, tten)
-            tdiag%con = tten(jci1:jci2,ici1:ici2,:) - ten0
+!$acc kernels present(ten0, tten, tdiag_con)
+            tdiag_con = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
-!$acc kernels present(qen0, qxten)
-            qdiag%con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc kernels present(qen0, qxten, qdiag_con)
+            qdiag_con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
@@ -1822,11 +1828,11 @@ module mod_moloch
           if ( any(icup < 0) ) then
             call shallow_convection
             if ( idiag > 0 ) then
-!$acc kernels present(ten0, tten)
-              tdiag%con = tten(jci1:jci2,ici1:ici2,:) - ten0
+!$acc kernels present(ten0, tten, tdiag_con)
+              tdiag_con = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
-!$acc kernels present(qen0, qxten)
-              qdiag%con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc kernels present(qen0, qxten, qdiag_con)
+              qdiag_con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
             end if
           end if
