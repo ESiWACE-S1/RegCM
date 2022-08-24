@@ -91,7 +91,7 @@ module mod_moloch
   real(rkx) , dimension(:,:,:) , pointer :: tke
   real(rkx) , dimension(:,:,:,:) , pointer :: qx , trac
 
-  real(rkx) , dimension(:,:,:) , pointer :: tten
+  real(rkx) , dimension(:,:,:) , pointer :: tten, qxten
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
@@ -214,6 +214,8 @@ module mod_moloch
 !$acc enter data create(ps)
     call assignpnt(mo_atm%tten,tten)
 !$acc enter data create(tten)
+    call assignpnt(mo_atm%qxten,qxten)
+    !$acc enter data create(qxten)
     call assignpnt(mo_atm%fmz,fmz)
 !$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
@@ -288,7 +290,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, tten)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, tten, qxten)
   end subroutine init_moloch
 
   !
@@ -1728,7 +1730,7 @@ module mod_moloch
         zdiv2(:,:,:) = d_zero
 !$acc end kernels
         tten = d_zero
-        mo_atm%qxten = d_zero
+        qxten = d_zero
         mo_atm%uten = d_zero
         mo_atm%vten = d_zero
         if ( ichem == 1 ) then
@@ -1781,7 +1783,7 @@ module mod_moloch
             ten0 = tten(jci1:jci2,ici1:ici2,:)
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+            qen0 = qxten(jci1:jci2,ici1:ici2,:,iqv)
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
@@ -1804,7 +1806,7 @@ module mod_moloch
             tdiag%con = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+            qdiag%con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
@@ -1820,7 +1822,7 @@ module mod_moloch
               tdiag%con = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-              qdiag%con = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+              qdiag%con = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
             end if
           end if
@@ -1836,7 +1838,7 @@ module mod_moloch
             ten0 = tten(jci1:jci2,ici1:ici2,:)
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+            qen0 = qxten(jci1:jci2,ici1:ici2,:,iqv)
 !$acc end kernels
           end if
           ! Cumulus clouds
@@ -1858,7 +1860,7 @@ module mod_moloch
             tdiag%lsc = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qdiag%lsc = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+            qdiag%lsc = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
         end if
@@ -1938,7 +1940,7 @@ module mod_moloch
             ten0 = tten(jci1:jci2,ici1:ici2,:)
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+            qen0 = qxten(jci1:jci2,ici1:ici2,:,iqv)
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
@@ -1952,7 +1954,7 @@ module mod_moloch
             tdiag%tbl = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qdiag%tbl = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+            qdiag%tbl = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
@@ -1967,7 +1969,7 @@ module mod_moloch
             ten0 = tten(jci1:jci2,ici1:ici2,:)
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
-            qen0 = mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv)
+            qen0 = qxten(jci1:jci2,ici1:ici2,:,iqv)
 !$acc end kernels
           end if
           call condtq
@@ -1977,7 +1979,7 @@ module mod_moloch
 !$acc end kernels
 !$acc kernels present(qen0, qxten)
             qdiag%lsc = qdiag%lsc + &
-                 mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+                 qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
         end if
@@ -2022,7 +2024,7 @@ module mod_moloch
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              qx(j,i,k,iqv) = qx(j,i,k,iqv) + mo_atm%qxten(j,i,k,iqv)*dtsec
+              qx(j,i,k,iqv) = qx(j,i,k,iqv) + qxten(j,i,k,iqv)*dtsec
               qx(j,i,k,iqv) = max(qx(j,i,k,iqv),minqq)
             end do
           end do
@@ -2034,7 +2036,7 @@ module mod_moloch
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
-                qx(j,i,k,n) = qx(j,i,k,n) + mo_atm%qxten(j,i,k,n)*dtsec
+                qx(j,i,k,n) = qx(j,i,k,n) + qxten(j,i,k,n)*dtsec
                 qx(j,i,k,n) = max(qx(j,i,k,n),d_zero)
               end do
             end do
