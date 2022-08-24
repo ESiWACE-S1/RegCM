@@ -91,7 +91,8 @@ module mod_moloch
   real(rkx) , dimension(:,:,:) , pointer :: tke
   real(rkx) , dimension(:,:,:,:) , pointer :: qx , trac
 
-  real(rkx) , dimension(:,:,:) , pointer :: tten, qxten
+  real(rkx) , dimension(:,:,:) , pointer :: tten
+  real(rkx) , dimension(:,:,:,:) , pointer :: qxten
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
