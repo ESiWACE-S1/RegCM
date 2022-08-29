@@ -110,6 +110,7 @@ module mod_moloch
 
   integer :: nadv , nsound
   real(rkx) :: nupait , ddamp , dzita
+  integer, save :: ncalls
 
   contains
 
@@ -196,72 +197,45 @@ module mod_moloch
   subroutine init_moloch
     implicit none
     call assignpnt(mddom%msfu,mu)
-!$acc enter data create(mu)
     call assignpnt(mddom%msfv,mv)
-!$acc enter data create(mv)
     call assignpnt(mddom%msfx,mx)
-!$acc enter data create(mx)
     call assignpnt(mddom%hx,hx)
-!$acc enter data create(hx(jde1ga:jde2ga,ice1:ice2))
     call assignpnt(mddom%hy,hy)
-!$acc enter data create(hy(jce1:jce2,ide1ga:ide2ga))
     call assignpnt(mddom%xlat,xlat)
     call assignpnt(mddom%xlon,xlon)
     call assignpnt(mddom%ht,ht)
     call assignpnt(sfs%psa,ps)
-!$acc enter data create(ps)
     call assignpnt(mo_atm%fmz,fmz)
-!$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
-!$acc enter data create(fmzf)
     call assignpnt(mo_atm%pai,pai)
-!$acc enter data create(pai)
     call assignpnt(mo_atm%tetav,tetav)
-!$acc enter data create(tetav)
     call assignpnt(mo_atm%u,u)
-!$acc enter data create(u(jde1gb:jde2gb,ice1ga:ice2ga,1:kz))
     call assignpnt(mo_atm%ux,ux)
-!$acc enter data create(ux)
     call assignpnt(mo_atm%v,v)
-!$acc enter data create(v(jce1ga:jce2ga,ide1gb:ide2gb,1:kz))
     call assignpnt(mo_atm%vx,vx)
-!$acc enter data create(vx)
     call assignpnt(mo_atm%w,w)
-!$acc enter data create(w(jce1:jce2,ice1:ice2,1:kzp1))
     call assignpnt(mo_atm%tvirt,tvirt)
-!$acc enter data create(tvirt)
     call assignpnt(mo_atm%zeta,zeta)
-!$acc enter data create(zeta)
     call assignpnt(mo_atm%p,p)
-!$acc enter data create(p)
     call assignpnt(mo_atm%t,t)
-!$acc enter data create(t)
     call assignpnt(mo_atm%rho,rho)
-!$acc enter data create(rho)
     call assignpnt(mo_atm%qx,qx)
     call assignpnt(mo_atm%qs,qsat)
-!$acc enter data create(qsat)
     call assignpnt(mo_atm%qx,qv,iqv)
-!$acc enter data create(qv)
     if ( ipptls > 0 ) then
       call assignpnt(mo_atm%qx,qc,iqc)
-!$acc enter data create(qc)
       if ( ipptls > 1 ) then
         call assignpnt(mo_atm%qx,qi,iqi)
         call assignpnt(mo_atm%qx,qr,iqr)
         call assignpnt(mo_atm%qx,qs,iqs)
-!$acc enter data create(qi,qr,qs)
       end if
     end if
     if ( ibltyp == 2 ) then
         call assignpnt(mo_atm%tke,tke)
-!$acc enter data create(tke)
     end if
     if ( ichem == 1 ) then
         call assignpnt(mo_atm%trac,trac)
-!$acc enter data create(trac)
     end if
-!$acc update device(zeta)
     if ( ifrayd == 1 ) then
         call xtoustag(zeta,zetau)
         call xtovstag(zeta,zetav)
@@ -282,8 +256,13 @@ module mod_moloch
     w(:,:,1) = d_zero
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
+
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv,&
+!$acc& mo_atm%zeta, mo_atm%zetaf)
+
+! Update dynamic arrays to device
+!$acc update device(u, v, pai, t, qx, ps)
   end subroutine init_moloch
 
   !
@@ -309,17 +288,11 @@ module mod_moloch
     iconvec = 0
 
 ! Start of accelerated section
-
-!$acc update device(pai, t, qv) async(2)
-!$acc update device(qc) async(2) if(ipptls > 0)
-!$acc update device(qi, qr, qs) async(2) if(ipptls > 1)
-
+!
     on_device = .true.
     
     call reset_tendencies
 
-!$acc wait(2)
-!$acc update device(u, v) async(2)
 !$acc parallel present(p, pai, qsat, t)
 !$acc loop collapse(3)
     do k = 1 , kz
@@ -446,7 +419,6 @@ module mod_moloch
       end if
     end if
 
-!$acc wait(2)
     do jadv = 1 , nadv
 
       call sound(dtsound)
@@ -454,12 +426,7 @@ module mod_moloch
       call advection(dtstepa)
 
     end do ! Advection loop
-
-!$acc update self(u, v, w, t, qv) async(2)
-!$acc update self(qc) async(2) if(ipptls > 0)
-!$acc update self(qi, qr, qs) async(2) if(ipptls > 1)
-!$acc update self(tke) async(2) if(ibltyp == 2)
-!$acc update self(trac) async(2) if(ichem == 1)
+!$acc update self(u,v,qx,tke) async(2)
 
     if ( do_filterpai ) then
 !$acc kernels present(pai, pf)
@@ -483,7 +450,6 @@ module mod_moloch
 !$acc end kernels
       end if
     end if
-!$acc update self(tetav) async(2)
 
 !$acc parallel present(tvirt, tetav, pai)
 !$acc loop collapse(3)
@@ -495,7 +461,6 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(tvirt) async(2)
 
     if ( ipptls > 0 ) then
       if ( ipptls > 1 ) then
@@ -558,7 +523,6 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(p, rho) async(2)
 
     !jday = yeardayfrac(rcmtimer%idate)
 !$acc parallel present(zeta, tvirt, ps, p) private(zdgz, lrt, tv)
@@ -588,11 +552,7 @@ module mod_moloch
       end do
     end do
 !$acc end parallel
-!$acc update self(qsat) async(2)
 
-!$acc wait(2)
-! End of accelerated section
-    on_device = .false.
     !
     ! Lateral/damping boundary condition
     !
@@ -600,10 +560,12 @@ module mod_moloch
       call boundary
       if ( i_crm /= 1 ) then
         if ( ifrayd == 1 ) then
+          !$acc wait(2)
           call raydamp(zetau,u,xub,jdi1,jdi2,ici1,ici2,1,kz)
           call raydamp(zetav,v,xvb,jci1,jci2,idi1,idi2,1,kz)
           call raydamp(zeta,t,xtb,jci1,jci2,ici1,ici2,1,kz)
           call raydamp(zeta,pai,xpaib,jci1,jci2,ici1,ici2,1,kz)
+          !$acc update device(u, v, t, pai) async(2)
         end if
       end if
     else
@@ -613,6 +575,7 @@ module mod_moloch
         end if
       end if
     end if
+
     !
     ! Prepare fields to be used in physical parametrizations.
     !
@@ -621,7 +584,17 @@ module mod_moloch
     ! PHYSICS
     !
     if ( do_phys .and. moloch_realcase ) then
+!$acc update self(w, qsat, p, rho, ps, tvirt, tetav) async(2)
+!$acc update self(tke) async(2) if(ibltyp == 2)
+!$acc update self(trac) async(2) if(ichem == 1)
+!$acc wait(2)
+      on_device = .false.
       call physical_parametrizations
+      on_device = .true.
+!$acc update device(u, v, w, t, qx, qsat, p, rho, ps, tvirt, tetav) async(2)
+!$acc update device(tke) async(2) if(ibltyp == 2)
+!$acc update device(trac) async(2) if(ichem == 1)
+!$acc wait(2)
     else
       if ( debug_level > 1 ) then
         if ( myid == italk ) then
@@ -637,6 +610,7 @@ module mod_moloch
     ! Diagnostic and end timestep
     !
     if ( syncro_rep%act( ) .and. rcmtimer%integrating( ) ) then
+!$acc wait(2)
       maxps = maxval(ps(jci1:jci2,ici1:ici2))
       minps = minval(ps(jci1:jci2,ici1:ici2))
       call maxall(maxps,pmax)
@@ -674,22 +648,36 @@ module mod_moloch
 #ifdef DEBUG
     call time_end(subroutine_name,idindx)
 #endif
+    on_device = .false.
 
     contains
 
       subroutine boundary
         implicit none
+        logical :: do_nudge
+
+        do_nudge = ( iboudy == 1 .or. iboudy >= 5 .or. iboudy == 4)
+
         call exchange_lrbt(ps,1,jce1,jce2,ice1,ice2)
+!$acc update self(ps) async(2) if(do_nudge)
         call exchange_lrbt(u,1,jde1,jde2,ice1,ice2,1,kz)
+!$acc update self(u) async(2) if(do_nudge)
         call exchange_lrbt(v,1,jce1,jce2,ide1,ide2,1,kz)
+!$acc update self(v) async(2) if(do_nudge)
         call exchange_lrbt(t,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update self(t) async(2) if(do_nudge)
         call exchange_lrbt(qv,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update self(qv) async(2) if(do_nudge)
         call exchange_lrbt(pai,1,jce1,jce2,ice1,ice2,1,kz)
+!$acc update self(pai) async(2) if(do_nudge)
         if ( ichem == 1 ) then
+          on_device = .false.
           call exchange_lrbt(trac,1,jce1,jce2,ice1,ice2,1,kz,1,ntr)
+          on_device = .true.
         end if
 
         if ( idiag > 0 ) then
+!$acc wait(2)
           ten0 = t(jci1:jci2,ici1:ici2,:)
           qen0 = qv(jci1:jci2,ici1:ici2,:)
         end if
@@ -700,37 +688,57 @@ module mod_moloch
         end if
 
         if ( iboudy == 1 .or. iboudy >= 5 ) then
+!$acc wait(2)
           call nudge(iboudy,pai,xpaib)
+!$acc update device(pai) async(2)
           call nudge(iboudy,ps,xpsb)
+!$acc update device(ps) async(2)
           call nudge(iboudy,t,xtb)
+!$acc update device(t) async(2)
           call nudge(iboudy,qv,xqb)
+!$acc update device(qv) async(2)
           call nudge(iboudy,u,v,xub,xvb)
+!$acc update device(u,v) async(2)
 
           if ( idiag > 0 ) then
             tdiag%bdy = t(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%bdy = qv(jci1:jci2,ici1:ici2,:) - qen0
           end if
           if ( is_present_qc( ) ) then
+!$acc update self(qc)
             call nudge(iboudy,qc,xlb)
+!$acc update device(qc) async(2)
           end if
           if ( is_present_qi( ) ) then
+!$acc update self(qi)
             call nudge(iboudy,qi,xib)
+!$acc update device(qi) async(2)
           end if
         else if ( iboudy == 4 ) then
+!$acc wait(2)
           call sponge(ps,xpsb)
+!$acc update device(ps) async(2)
           call sponge(pai,xpaib)
+!$acc update device(pai) async(2)
           call sponge(t,xtb)
+!$acc update device(t) async(2)
           call sponge(qv,xqb)
+!$acc update device(qv) async(2)
           call sponge(u,v,xub,xvb)
+!$acc update device(u,v) async(2)
           if ( idiag > 0 ) then
             tdiag%bdy = t(jci1:jci2,ici1:ici2,:) - ten0
             qdiag%bdy = qv(jci1:jci2,ici1:ici2,:) - qen0
           end if
           if ( is_present_qc( ) ) then
+!$acc update self(qc)
             call sponge(qc,xlb)
+!$acc update device(qc) async(2)
           end if
           if ( is_present_qi( ) ) then
+!$acc update self(qi)
             call sponge(qi,xib)
+!$acc update device(qi) async(2)
           end if
         end if
         if ( ichem == 1 ) then
@@ -743,6 +751,7 @@ module mod_moloch
             cbdydiag = trac(jci1:jci2,ici1:ici2,:,:) - chiten0
           end if
         end if
+!$acc wait(2)
         call uvstagtox(u,v,ux,vx)
         if ( do_filterqx .and. ipptls > 0 ) then
           call exchange_lrbt(qx,1,jce1,jce2,ice1,ice2,1,kz,iqfrst,iqlst)
@@ -1253,11 +1262,11 @@ module mod_moloch
 
         ! Compute W (and TKE if required) on zita levels
 
-!$acc update device(w)
+!!$acc update device(w)
         call wstagtox(w,wx)
 
         if ( ibltyp == 2 ) then
-!$acc update device(tke)
+!!$acc update device(tke)
           call wstagtox(tke,tkex)
         end if
 
@@ -1289,10 +1298,10 @@ module mod_moloch
         call xtouvstag(ux,vx,u,v)
 
         ! Back to half-levels
-!$acc update device(wx)
+!!$acc update device(wx)
         call xtowstag(wx,w)
         if ( ibltyp == 2 ) then
-!$acc update device(tkex)
+!!$acc update device(tkex)
           call xtowstag(tkex,tke)
         end if
       end subroutine advection

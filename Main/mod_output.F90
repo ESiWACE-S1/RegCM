@@ -213,6 +213,7 @@ module mod_output
 
     if ( atm_stream > 0 ) then
       if ( ldoatm ) then
+!$acc wait(2) if (idynamic == 3)
         ps_out = sfs%psa(jci1:jci2,ici1:ici2)
         if ( associated(atm_t_out) ) then
           if ( idynamic == 3 ) then
@@ -227,9 +228,9 @@ module mod_output
         end if
         if ( associated(atm_u_out) .and. associated(atm_v_out) ) then
           if ( idynamic == 3 ) then
-!!$acc update device(mo_atm%u,mo_atm%v)
+            on_device = .true.
             call uvstagtox(mo_atm%u,mo_atm%v,mo_atm%ux,mo_atm%vx)
-!!$acc update self(mo_atm%ux,mo_atm%vx)
+            on_device = .false.
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -257,13 +258,13 @@ module mod_output
           end if
         end if
         if ( associated(atm_omega_out) ) then
+!$acc update self(omega)
           atm_omega_out = omega(jci1:jci2,ici1:ici2,:)*d_10
         end if
         if ( associated(atm_w_out) ) then
           if ( idynamic == 3 ) then
-!!$acc update device(mo_atm%w)
+!$acc update self(mo_atm%w)
             call wstagtox(mo_atm%w,atm_w_out)
-!!$acc update self(atm_w_out)
           else
             do k = 1 , kz
               do i = ici1 , ici2
@@ -344,6 +345,8 @@ module mod_output
         end if
         if ( associated(atm_rh_out) ) then
           if ( idynamic == 3 ) then
+!$acc parallel copyout(atm_rh_out) present(mo_atm, mo_atm%qx, mo_atm%t, mo_atm%p)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -353,6 +356,7 @@ module mod_output
                 end do
               end do
             end do
+!$acc end parallel
           else
             do k = 1 , kz
               do i = ici1 , ici2
@@ -366,6 +370,7 @@ module mod_output
           end if
         end if
         if ( associated(atm_pf_out) ) then
+!$acc update self(atms%pf3d)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -421,6 +426,8 @@ module mod_output
           end if
         else if ( idynamic == 3 ) then
           if ( associated(atm_ph_out) ) then
+!$acc parallel copyout(atm_ph_out) present(mo_atm, mo_atm%pai)
+!$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
@@ -428,6 +435,7 @@ module mod_output
                 end do
               end do
             end do
+!$acc end parallel
           end if
           if ( associated(atm_zh_out) ) then
             do k = 1 , kz
@@ -565,6 +573,7 @@ module mod_output
         if ( ibltyp == 2 ) then
           if ( associated(atm_tke_out) ) then
             if ( idynamic == 3 ) then
+!$acc update self(mo_atm%tke)
               atm_tke_out = mo_atm%tke(jci1:jci2,ici1:ici2,1:kz)
             else
               atm_tke_out = atm1%tke(jci1:jci2,ici1:ici2,1:kz)
@@ -1022,9 +1031,7 @@ module mod_output
         if ( associated(srf_ua100_out) .and. &
              associated(srf_va100_out) ) then
           if ( idynamic == 3 ) then
-!!$acc update device(mo_atm%u,mo_atm%v)
             call uvstagtox(mo_atm%u,mo_atm%v,mo_atm%ux,mo_atm%vx)
-!!$acc update self(mo_atm%ux,mo_atm%vx)
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zz = mo_atm%zeta(j,i,kz)
