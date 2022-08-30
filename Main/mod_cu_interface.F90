@@ -89,6 +89,9 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: utenx , vtenx
   real(rkx) , pointer , dimension(:,:,:) :: utend , vtend
 
+  real(rkx) , pointer , dimension(:,:,:) :: m2c_was
+  real(rkx) , pointer , dimension(:,:,:) :: m2c_wpas
+
   ! Midlevel convection top pressure for Tiedtke iconv = 1
   real(rkx) , parameter :: cmcptop = 30000.0_rkx
 
@@ -99,6 +102,7 @@ module mod_cu_interface
     implicit none
     integer(ik4) :: i , j
     call getmem2d(cuscheme,jci1,jci2,ici1,ici2,'cumulus:cuscheme')
+  !$acc enter data create(cuscheme)
     do i = ici1 , ici2
       do j = jci1 , jci2
         if ( isocean(mddom%lndcat(j,i)) ) then
@@ -139,6 +143,7 @@ module mod_cu_interface
       call allocate_mod_cu_kf
       call kf_lutab
     end if
+!$acc update device(cuscheme)
   end subroutine allocate_cumulus
 
   subroutine init_cumulus
@@ -162,6 +167,10 @@ module mod_cu_interface
     call assignpnt(atms%vbx3d,m2c%vas)
     call assignpnt(atms%wpx3d,m2c%wpas)
     call assignpnt(atms%wb3d,m2c%was)
+    call assignpnt(m2c%was, m2c_was)
+!$acc enter data create(m2c_was)
+    call assignpnt(m2c%wpas, m2c_wpas)
+!$acc enter data create(m2c_wpas)
     if ( idynamic == 3 ) then
       call assignpnt(mo_atm%tke,m2c%tkeas)
       call assignpnt(mo_atm%qx,m2c%qq1,iqv)
@@ -216,6 +225,7 @@ module mod_cu_interface
     call assignpnt(rain_cc,c2m%rain_cc)
     call assignpnt(crrate,c2m%trrate)
     call init_mod_cumulus
+!$acc update device(m2c_was, m2c_wpas)
   end subroutine init_cumulus
 
   subroutine cucloud
@@ -252,16 +262,19 @@ module mod_cu_interface
 
     if ( any(icup == 6) ) then
       w1 = d_one/real(max(int(max(dtcum,900.0_rkx)/dtsec),1),rkx)
+!$acc parallel present(cuscheme, avg_ww, m2c_was)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
             if ( cuscheme(j,i) == 6 ) then
               avg_ww(j,i,k) = (d_one - w1) * avg_ww(j,i,k) + &
-                            w1 * d_half * (m2c%was(j,i,k)+m2c%was(j,i,k+1))
+                            w1 * d_half * (m2c_was(j,i,k)+m2c_was(j,i,k+1))
             end if
           end do
         end do
       end do
+!$acc end parallel
     end if
 
     if ( any(icup == 5) ) then
@@ -290,15 +303,18 @@ module mod_cu_interface
       end if
 
       w1 = d_one/real(max(int(max(dtcum,300.0_rkx)/dtsec),1),rkx)
+!$acc parallel present(cuscheme, avg_ww, m2c_wpas)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
             if ( cuscheme(j,i) == 5 ) then
-              avg_ww(j,i,k) = (d_one-w1)*avg_ww(j,i,k) + w1*m2c%wpas(j,i,k)
+              avg_ww(j,i,k) = (d_one-w1)*avg_ww(j,i,k) + w1*m2c_wpas(j,i,k)
             end if
           end do
         end do
       end do
+!$acc end parallel
     end if
 
     ! Skip first timestep
@@ -311,13 +327,17 @@ module mod_cu_interface
           write(stdout,*) 'Calling cumulus scheme at ',trim(rcmtimer%str())
         end if
 
+!$acc kernels present(cu_prate, cu_ktop, cu_kbot, cu_tten)
         cu_prate(:,:) = d_zero
         cu_ktop(:,:) = 0
         cu_kbot(:,:) = 0
         cu_tten(:,:,:) = d_zero
+!$acc end kernels
         if ( any(icup == 4) .or. any(icup == 5) ) then
+!$acc kernels present(cu_uten, cu_vten)
           cu_uten(:,:,:) = d_zero
           cu_vten(:,:,:) = d_zero
+!$acc end kernels
           if ( any(icup == 5) ) then
             if ( idynamic == 3 ) then
               utend(jdi1:jdi2,ici1:ici2,:) = m2c%uten
@@ -332,8 +352,10 @@ module mod_cu_interface
           utend = d_zero
           vtend = d_zero
         end if
+!$acc kernels present(cu_qten, cu_cldfrc)
         cu_qten(:,:,:,:) = d_zero
         cu_cldfrc(:,:,:) = d_zero
+!$acc end kernels
         if ( ichem == 1 ) then
           cu_chiten(:,:,:,:) = d_zero
           cu_convpr(:,:,:) = d_zero
@@ -393,6 +415,8 @@ module mod_cu_interface
         end if
 
         if ( ipptls == 2 ) then
+!$acc parallel present(cu_qten)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
@@ -403,6 +427,7 @@ module mod_cu_interface
               end do
             end do
           end do
+!$acc end parallel
         end if
 
       end if

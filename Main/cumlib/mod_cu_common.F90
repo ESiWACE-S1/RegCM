@@ -74,15 +74,24 @@ module mod_cu_common
         call getmem3d(cu_vten,jce1gb,jce2gb,ice1gb,ice2gb,1,kz,'cumulus:vten')
       else
         call getmem3d(cu_uten,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'cumulus:uten')
+
         call getmem3d(cu_vten,jce1ga,jce2ga,ice1ga,ice2ga,1,kz,'cumulus:vten')
       end if
+!$acc enter data create(cu_uten)
+!$acc enter data create(cu_vten)
     end if
     call getmem3d(cu_tten,jci1,jci2,ici1,ici2,1,kz,'cumulus:tten')
+!$acc enter data create(cu_tten)
     call getmem4d(cu_qten,jci1,jci2,ici1,ici2,1,kz,1,nqx,'cumulus:qten')
+!$acc enter data create(cu_qten)
     call getmem3d(cu_cldfrc,jci1,jci2,ici1,ici2,1,kz,'cumulus:cldfrc')
+!$acc enter data create(cu_cldfrc)
     call getmem2d(cu_prate,jci1,jci2,ici1,ici2,'cumulus:prate')
+  !$acc enter data create(cu_prate)
     call getmem2d(cu_ktop,jci1,jci2,ici1,ici2,'cumulus:ktop')
+  !$acc enter data create(cu_ktop)
     call getmem2d(cu_kbot,jci1,jci2,ici1,ici2,'cumulus:kbot')
+!$acc enter data create(cu_kbot)
     if ( ichem == 1 ) then
       call getmem4d(cu_chiten,jci1,jci2,ici1,ici2,1,kz,1,ntr,'cumulus:chiten')
       call getmem3d(cu_convpr,jci1,jci2,ici1,ici2,1,kz,'cumulus:convpr')
@@ -93,6 +102,7 @@ module mod_cu_common
     end if
     if ( any(icup == 5) .or. any(icup == 6) ) then
       call getmem3d(avg_ww,jci1,jci2,ici1,ici2,1,kz,'cumulus:avg_ww')
+!$acc enter data create(avg_ww)
     end if
 
     if ( icumcloud == 2 ) then
@@ -120,6 +130,7 @@ module mod_cu_common
         cld_profile = fixed_cld_profile
       end if
     end if
+!$acc update device(avg_ww)
   end subroutine init_mod_cumulus
 
   subroutine model_cumulus_cloud(m2c)
