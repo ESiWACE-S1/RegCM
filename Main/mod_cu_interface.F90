@@ -89,8 +89,14 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: utenx , vtenx
   real(rkx) , pointer , dimension(:,:,:) :: utend , vtend
 
+  real(rkx) , pointer , dimension(:,:) :: c2m_pcratec
+  real(rkx) , pointer , dimension(:,:) :: c2m_trrate
+  real(rkx) , pointer , dimension(:,:) :: c2m_rainc
+  real(rkx) , pointer , dimension(:,:) :: c2m_kcumtop
+  real(rkx) , pointer , dimension(:,:) :: c2m_kcumbot
   real(rkx) , pointer , dimension(:,:,:) :: m2c_was
   real(rkx) , pointer , dimension(:,:,:) :: m2c_wpas
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_tten
 
   ! Midlevel convection top pressure for Tiedtke iconv = 1
   real(rkx) , parameter :: cmcptop = 30000.0_rkx
@@ -196,6 +202,8 @@ module mod_cu_interface
       call assignpnt(mo_atm%vten,m2c%vten)
       if ( ichem == 1 ) call assignpnt(mo_atm%chiten,m2c%chiten)
       call assignpnt(mo_atm%tten,c2m%tten)
+      call assignpnt(c2m%tten,c2m_tten)
+!$acc enter data create(c2m_tten)
       call assignpnt(mo_atm%uten,c2m%uten)
       call assignpnt(mo_atm%vten,c2m%vten)
       call assignpnt(mo_atm%qxten,c2m%qxten)
@@ -215,17 +223,27 @@ module mod_cu_interface
       if ( ichem == 1 ) call assignpnt(aten%chi,c2m%chiten,pc_physic)
     end if
     call assignpnt(sfs%rainc,c2m%rainc)
+    call assignpnt(c2m%rainc,c2m_rainc)
+!$acc enter data create(c2m_rainc)
     call assignpnt(pptc,c2m%pcratec)
+    call assignpnt(c2m%pcratec, c2m_pcratec)
+!$acc enter data create(c2m_pcratec)
     call assignpnt(cldfra,c2m%cldfrc)
     call assignpnt(cldlwc,c2m%cldlwc)
     call assignpnt(icumtop,c2m%kcumtop)
+    call assignpnt(c2m%kcumtop,c2m_kcumtop)
+!$acc enter data create(c2m_kcumtop)
     call assignpnt(icumbot,c2m%kcumbot)
+    call assignpnt(c2m%kcumbot,c2m_kcumbot)
+!$acc enter data create(c2m_kcumbot)
     if ( ichem == 1 ) call assignpnt(convpr,c2m%convpr)
     call assignpnt(q_detr,c2m%q_detr)
     call assignpnt(rain_cc,c2m%rain_cc)
     call assignpnt(crrate,c2m%trrate)
+    call assignpnt(c2m%trrate,c2m_trrate)
+
     call init_mod_cumulus
-!$acc update device(m2c_was, m2c_wpas)
+!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten)
   end subroutine init_cumulus
 
   subroutine cucloud
@@ -434,25 +452,31 @@ module mod_cu_interface
 
       ! Sum cumulus tendencies
 
+!$acc parallel present(cu_prate, cu_ktop, cu_kbot, c2m_pcratec, c2m_trrate, c2m_rainc, c2m_kcumtop, c2m_kcumbot)
+!$acc loop collapse(2)
       do i = ici1 , ici2
         do j = jci1 , jci2
-          c2m%pcratec(j,i) = c2m%pcratec(j,i) + cu_prate(j,i)
-          c2m%trrate(j,i) = cu_prate(j,i)
-          c2m%rainc(j,i) = c2m%rainc(j,i) + cu_prate(j,i) * dtsec
-          c2m%kcumtop(j,i) = cu_ktop(j,i)
-          c2m%kcumbot(j,i) = cu_kbot(j,i)
+          c2m_pcratec(j,i) = c2m_pcratec(j,i) + cu_prate(j,i)
+          c2m_trrate(j,i) = cu_prate(j,i)
+          c2m_rainc(j,i) = c2m_rainc(j,i) + cu_prate(j,i) * dtsec
+          c2m_kcumtop(j,i) = cu_ktop(j,i)
+          c2m_kcumbot(j,i) = cu_kbot(j,i)
         end do
       end do
+!$acc end parallel
 
       if ( idynamic == 3 ) then
 
+!$acc parallel present(cu_tten, c2m_tten)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              c2m%tten(j,i,k) = c2m%tten(j,i,k) + cu_tten(j,i,k)
+              c2m_tten(j,i,k) = c2m_tten(j,i,k) + cu_tten(j,i,k)
             end do
           end do
         end do
+!$acc end parallel
 
         if ( any(icup == 5) .or. any(icup == 4) ) then
           do k = 1 , kz
