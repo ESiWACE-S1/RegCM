@@ -555,7 +555,6 @@ module mod_moloch
 
     if ( idiag > 0 ) then
 !$acc wait(2)
-!$acc update self(t, qv)
       tdiag%adh = (t(jci1:jci2,ici1:ici2,:) - ten0) * rdt
       qdiag%adh = (qv(jci1:jci2,ici1:ici2,:) - qen0) * rdt
     end if
@@ -945,11 +944,17 @@ module mod_moloch
           end do
 !$acc end parallel
 
-! DANGER
-! Parallelizing the following two lines causes a crash with managed memory
-          ud(jde1ga:jde2ga,ice1ga:ice2ga,1:kz) = u(jde1ga:jde2ga,ice1ga:ice2ga,1:kz)
-          vd(jce1ga:jce2ga,ide1ga:ide2ga,1:kz) = v(jce1ga:jce2ga,ide1ga:ide2ga,1:kz)
-! /DANGER
+!$acc parallel present(u, v, ud, vd)
+!$acc loop collapse(3)
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                ud(j,i,k) = u(j,i,k)              
+                vd(j,i,k) = v(j,i,k)              
+              end do
+            end do
+          end do
+!$acc end parallel
 
           ! Equation 10, generalized vertical velocity
 
