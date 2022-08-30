@@ -1049,7 +1049,7 @@ module mod_init
       end if
 !$acc update device(ffilt)
     end if
-!    call initialize_surface_model
+    call initialize_surface_model
     if ( idynamic /= 3 ) then
       call initialize_diffusion
       if ( idynamic == 2 ) then
