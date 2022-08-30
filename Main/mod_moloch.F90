@@ -96,7 +96,6 @@ module mod_moloch
   real(rkx) , dimension(:,:,:) , pointer :: qdiag_con
   real(rkx) , dimension(:,:,:,:) , pointer :: qxten
   real(rkx) , dimension(:,:,:,:) , pointer :: chiten
-  
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
