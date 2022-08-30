@@ -192,6 +192,7 @@ module mod_che_common
                     ici1,ici2,1,kz,1,ntr,'che_common:cconvdiag')
       call getmem4d(ctbldiag,jci1,jci2, &
                     ici1,ici2,1,kz,1,ntr,'che_common:ctbldiag')
+!$acc enter data create(ctbldiag)
       call getmem4d(cbdydiag,jci1,jci2, &
                     ici1,ici2,1,kz,1,ntr,'che_common:cbdydiag')
       call getmem4d(cseddpdiag,jci1,jci2, &

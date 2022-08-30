@@ -92,10 +92,17 @@ module mod_moloch
   real(rkx) , dimension(:,:,:,:) , pointer :: qx , trac
 
   real(rkx) , dimension(:,:,:) , pointer :: tten
+  real(rkx) , dimension(:,:,:) , pointer :: uten
+  real(rkx) , dimension(:,:,:) , pointer :: vten
+  real(rkx) , dimension(:,:,:) , pointer :: tketen
   real(rkx) , dimension(:,:,:) , pointer :: tdiag_con
+  real(rkx) , dimension(:,:,:) , pointer :: tdiag_lsc
+  real(rkx) , dimension(:,:,:) , pointer :: tdiag_tbl
   real(rkx) , dimension(:,:,:) , pointer :: qdiag_con
   real(rkx) , dimension(:,:,:,:) , pointer :: qxten
   real(rkx) , dimension(:,:,:,:) , pointer :: chiten
+  real(rkx) , dimension(:,:,:,:) , pointer :: qdiag_lsc
+  real(rkx) , dimension(:,:,:,:) , pointer :: qdiag_tbl
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
@@ -218,14 +225,28 @@ module mod_moloch
 !$acc enter data create(ps)
     call assignpnt(mo_atm%tten,tten)
 !$acc enter data create(tten)
+    call assignpnt(mo_atm%uten,uten)
+!$acc enter data create(uten)
+    call assignpnt(mo_atm%vten,vten)
+!$acc enter data create(vten)
+    call assignpnt(mo_atm%tketen,tketen)
+!$acc enter data create(tketen)
     call assignpnt(tdiag%con,tdiag_con)
 !$acc enter data create(tdiag_con)
+    call assignpnt(tdiag%lsc,tdiag_lsc)
+!$acc enter data create(tdiag_lsc)
+    call assignpnt(tdiag%tbl,tdiag_tbl)
+!$acc enter data create(tdiag_tbl)
     call assignpnt(mo_atm%qxten,qxten)
 !$acc enter data create(qxten)
     call assignpnt(mo_atm%chiten,chiten)
 !$acc enter data create(chiten)
     call assignpnt(qdiag%con,qdiag_con)
 !$acc enter data create(qdiag_con)
+    call assignpnt(qdiag%lsc,qdiag_lsc)
+!$acc enter data create(qdiag_lsc)
+    call assignpnt(qdiag%tbl,qdiag_tbl)
+!$acc enter data create(qdiag_tbl)
     call assignpnt(mo_atm%fmz,fmz)
 !$acc enter data create(fmz)
     call assignpnt(mo_atm%fmzf,fmzf)
@@ -300,7 +321,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, tten, qxten, chiten, tdiag_con, qdiag_con)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, chiten, tdiag_con, qdiag_con, tdiag_lsc, qdiag_lsc, tdiag_tbl, qdiag_tbl)
   end subroutine init_moloch
 
   !
@@ -1746,13 +1767,13 @@ module mod_moloch
 !$acc end kernels
         tten = d_zero
         qxten = d_zero
-        mo_atm%uten = d_zero
-        mo_atm%vten = d_zero
+        uten = d_zero
+        vten = d_zero
         if ( ichem == 1 ) then
           chiten = d_zero
         end if
         if ( ibltyp == 2 ) then
-          mo_atm%tketen = d_zero
+          tketen = d_zero
         end if
 
         cldfra(:,:,:) = d_zero
@@ -1871,11 +1892,11 @@ module mod_moloch
           call cldfrac(cldlwc,cldfra)
           call microscheme
           if ( idiag > 0 ) then
-!$acc kernels present(ten0, tten)
-            tdiag%lsc = tten(jci1:jci2,ici1:ici2,:) - ten0
+!$acc kernels present(ten0, tten, tdiag_lsc)
+            tdiag_lsc = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
-!$acc kernels present(qen0, qxten)
-            qdiag%lsc = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc kernels present(qen0, qxten, qdiag_lsc)
+            qdiag_lsc = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
         end if
@@ -1920,7 +1941,7 @@ module mod_moloch
         ! Add radiative transfer package-calculated heating rates to
         ! temperature tendency (deg/sec)
         !
-!$acc parallel present(tten)
+!$acc parallel present(tten, heatrt)
 !$acc loop collapse(3)
         do j = jci1 , jci2
           do i = ici1 , ici2
@@ -1965,15 +1986,15 @@ module mod_moloch
           end if
           call pblscheme
           if ( idiag > 0 ) then
-!$acc kernels present(ten0, tten)
-            tdiag%tbl = tten(jci1:jci2,ici1:ici2,:) - ten0
+!$acc kernels present(ten0, tten, tdiag_tbl)
+            tdiag_tbl = tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
-!$acc kernels present(qen0, qxten)
-            qdiag%tbl = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
+!$acc kernels present(qen0, qxten, qdiag_tbl)
+            qdiag_tbl = qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0, chiten)
+!$acc kernels present(chiten0, chiten, ctbldiag)
             ctbldiag = chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
 !$acc end kernels
           end if
@@ -1989,11 +2010,11 @@ module mod_moloch
           end if
           call condtq
           if ( idiag > 0 ) then
-!$acc kernels present(ten0, tten)
-            tdiag%lsc = tdiag%lsc + tten(jci1:jci2,ici1:ici2,:) - ten0
+!$acc kernels present(ten0, tten, tdiag_lsc)
+            tdiag_lsc = tdiag_lsc + tten(jci1:jci2,ici1:ici2,:) - ten0
 !$acc end kernels
-!$acc kernels present(qen0, qxten)
-            qdiag%lsc = qdiag%lsc + &
+!$acc kernels present(qen0, qxten, qdiag_lsc)
+            qdiag_lsc = qdiag_lsc + &
                  qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
 !$acc end kernels
           end if
@@ -2004,7 +2025,7 @@ module mod_moloch
         !
         ! Update status
         !
-!$acc parallel present(tten)
+!$acc parallel present(tten, t)
 !$acc loop collapse(3)
         do j = jci1 , jci2
           do i = ici1 , ici2
@@ -2014,27 +2035,27 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc parallel
+!$acc parallel present(u, uten)
 !$acc loop collapse(3)
         do j = jdi1 , jdi2
           do i = ici1 , ici2
             do k = 1 , kz
-              u(j,i,k) = u(j,i,k) + dtsec * mo_atm%uten(j,i,k)
+              u(j,i,k) = u(j,i,k) + dtsec * uten(j,i,k)
             end do
           end do
         end do
 !$acc end parallel
-!$acc parallel
+!$acc parallel present(v, vten)
 !$acc loop collapse(3)
         do j = jci1 , jci2
           do i = idi1 , idi2
             do k = 1 , kz
-              v(j,i,k) = v(j,i,k) + dtsec * mo_atm%vten(j,i,k)
+              v(j,i,k) = v(j,i,k) + dtsec * vten(j,i,k)
             end do
           end do
         end do
 !$acc end parallel
-!$acc parallel present(qx)
+!$acc parallel present(qx, qxten)
 !$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
@@ -2045,7 +2066,7 @@ module mod_moloch
           end do
         end do
 !$acc end parallel
-!$acc parallel present(qx)
+!$acc parallel present(qx, qxten)
 !$acc loop collapse(4)
         do n = iqfrst , iqlst
           do k = 1 , kz
@@ -2059,12 +2080,12 @@ module mod_moloch
         end do
 !$acc end parallel
         if ( ibltyp == 2 ) then
-!$acc parallel
+!$acc parallel present(tke, tketen)
 !$acc loop collapse(3)
           do j = jci1 , jci2
             do i = ici1 , ici2
               do k = 1 , kzp1
-                tke(j,i,k) = max(tke(j,i,k) + dtsec * mo_atm%tketen(j,i,k),tkemin)
+                tke(j,i,k) = max(tke(j,i,k) + dtsec * tketen(j,i,k),tkemin)
               end do
             end do
           end do
