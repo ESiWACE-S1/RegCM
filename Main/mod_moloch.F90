@@ -1062,13 +1062,6 @@ module mod_moloch
                 w(j,i,k) = zrapp * (zwexpl + zd * w(j,i,k+1))
                 wwkw(j,i,k) = zrapp * zu
               end do
-            end do
-          end do
-!$acc end parallel
-!$acc parallel present(w, wwkw, deltaw)
-!$acc loop collapse(2)
-          do i = ici1 , ici2
-            do j = jci1 , jci2
 !$acc loop seq
               do k = 2 , kz
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
@@ -1348,7 +1341,7 @@ module mod_moloch
         end do
 !$acc end parallel
 
-!$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, wfwkp1, zamum1, ism1, k1m1, k1p1m1, rm1, bm1, zphim1, wfwk, zrfmu, zrfmd, zdv)
+!$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, wfwkp1, wfwk, zrfmu, zrfmd, zdv)
 !$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
@@ -1378,21 +1371,21 @@ module mod_moloch
               if(k > 1) then
                 zamum1 = s(j,i,k) * zdtrdz
                 if ( zamum1 >= d_zero ) then
-                  ism1 = d_one
-                  k1m1 = k
-                  k1p1m1 = k1m1 + 1
-                  if ( k1p1m1 > kz ) k1p1m1 = kz
+                  is = d_one
+                  k1 = k
+                  k1p1 = k1 + 1
+                  if ( k1p1 > kz ) k1p1 = kz
                 else
-                  ism1 = -d_one
-                  k1m1 = k - 2
-                  k1p1m1 = k - 1
-                  if ( k1m1 < 1 ) k1m1 = 1
+                  is = -d_one
+                  k1 = k - 2
+                  k1p1 = k - 1
+                  if ( k1 < 1 ) k1 = 1
                 end if
-                rm1 = rdeno(pp(j,i,k1m1),pp(j,i,k1p1m1),pp(j,i,k-1),pp(j,i,k))
-                bm1 = max(wlow, min(whigh, max(rm1, min(d_two*rm1,d_one))))
-                zphim1 = ism1 + zamum1 * bm1 - ism1 * bm1
-                wfwk = d_half * s(j,i,k) * ((d_one+zphim1)*pp(j,i,k) + &
-                                                    (d_one-zphim1)*pp(j,i,k-1))
+                r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k-1),pp(j,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu * b - is * b
+                wfwk = d_half * s(j,i,k) * ((d_one+zphi)*pp(j,i,k) + &
+                                                    (d_one-zphi)*pp(j,i,k-1))
               else
                 wfwk = d_zero
               end if
