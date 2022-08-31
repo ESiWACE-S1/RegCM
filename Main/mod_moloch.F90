@@ -1122,7 +1122,7 @@ module mod_moloch
 !!$acc update device(pai, deltaw)
 
           if ( lrotllr ) then
-!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
+!$acc parallel present(mu, deltaw, tetav, coru, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1165,7 +1165,7 @@ module mod_moloch
 
           else
 
-!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
+!$acc parallel present(mu, deltaw, tetav, coru, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
