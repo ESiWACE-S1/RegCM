@@ -84,7 +84,7 @@ module mod_moloch
   real(rkx) , dimension(:,:,:) , pointer :: zeta , zetau , zetav
   real(rkx) , dimension(:,:,:) , pointer :: u , v , w
   real(rkx) , dimension(:,:,:) , pointer :: ux , vx
-  real(rkx) , dimension(:,:,:) , pointer :: ud
+  real(rkx) , dimension(:,:,:) , pointer :: ud , vd
   real(rkx) , dimension(:,:,:) , pointer :: p , t , rho
   real(rkx) , dimension(:,:,:) , pointer :: qv , qc , qi , qr , qs , qsat
   real(rkx) , dimension(:,:,:) , pointer :: qwltot , qwitot
@@ -170,7 +170,8 @@ module mod_moloch
       end if
     end if
     call getmem3d(ud,jde1ga,jde2ga,ice1ga,ice2ga,1,kz,'moloch:ud')
-!$acc enter data create(ud)
+    call getmem3d(vd,jce1ga,jce2ga,ide1ga,ide2ga,1,kz,'moloch:vd')
+!$acc enter data create(ud, vd)
     if ( ifrayd == 1 ) then
       call getmem3d(zetau,jdi1,jdi2,ici1,ici2,1,kz,'moloch:zetau')
       call getmem3d(zetav,jci1,jci2,idi1,idi2,1,kz,'moloch:zetav')
@@ -935,7 +936,19 @@ module mod_moloch
           end do
 !$acc end parallel
 
-! Equation 10, generalized vertical velocity
+!$acc parallel present(u, v, ud, vd)
+!$acc loop collapse(3)
+          do k = 1 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                ud(j,i,k) = u(j,i,k)              
+                vd(j,i,k) = v(j,i,k)              
+              end do
+            end do
+          end do
+!$acc end parallel
+
+          ! Equation 10, generalized vertical velocity
 
 !$acc parallel present(u, hx, v, hy, s, gzitak) private(zuh, zvh)
 !$acc loop collapse(3)
@@ -1122,7 +1135,7 @@ module mod_moloch
 !!$acc update device(pai, deltaw)
 
           if ( lrotllr ) then
-!$acc parallel present(mu, deltaw, tetav, coru, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1133,9 +1146,9 @@ module mod_moloch
                      deltaw(j,i,k)   + deltaw(j,i,k+1)) + egrav * dts
                   zrom1u = d_half * cpd * (tetav(j-1,i,k) + tetav(j,i,k))
                   zcor1u = coru(j,i) * dts * 0.25_rkx * &
-                       (v(j,i,k) + v(j-1,i,k) + v(j-1,i+1,k) + v(j,i+1,k))
+                       (vd(j,i,k) + vd(j-1,i,k) + vd(j-1,i+1,k) + vd(j,i+1,k))
                   ! Equation 17
-                  ud(j,i,k) = u(j,i,k) + zcor1u - &
+                  u(j,i,k) = u(j,i,k) + zcor1u - &
                              zfz * hx(j,i) * gzitakh(k) - &
                              zcx * zrom1u * (pai(j,i,k) - pai(j-1,i,k))
                 end do
@@ -1153,7 +1166,7 @@ module mod_moloch
                      deltaw(j,i,k)   + deltaw(j,i,k+1)) + egrav * dts
                   zrom1v = d_half * cpd * (tetav(j,i-1,k) + tetav(j,i,k))
                   zcor1v = corv(j,i) * dts * 0.25_rkx * &
-                       (u(j,i,k) + u(j,i-1,k) + u(j+1,i,k) + u(j+1,i-1,k))
+                       (ud(j,i,k) + ud(j,i-1,k) + ud(j+1,i,k) + ud(j+1,i-1,k))
                   ! Equation 18
                   v(j,i,k) = v(j,i,k) - zcor1v - &
                              zfz * hy(j,i) * gzitakh(k) -  &
@@ -1165,7 +1178,7 @@ module mod_moloch
 
           else
 
-!$acc parallel present(mu, deltaw, tetav, coru, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
+!$acc parallel present(mu, deltaw, tetav, coru, vd, u, hx, gzitakh, pai) private(zcx, zfz, zrom1u, zcor1u)
 !$acc loop collapse(3)
             do k = 1 , kz
               do i = ici1 , ici2
@@ -1176,9 +1189,9 @@ module mod_moloch
                      deltaw(j,i,k)   + deltaw(j,i,k+1)) + egrav * dts
                   zrom1u = d_half * cpd * (tetav(j-1,i,k) + tetav(j,i,k))
                   zcor1u = coru(j,i) * dts * 0.25_rkx * &
-                       (v(j,i,k) + v(j-1,i,k) + v(j-1,i+1,k) + v(j,i+1,k))
+                       (vd(j,i,k) + vd(j-1,i,k) + vd(j-1,i+1,k) + vd(j,i+1,k))
                   ! Equation 17
-                  ud(j,i,k) = u(j,i,k) + zcor1u - &
+                  u(j,i,k) = u(j,i,k) + zcor1u - &
                              zfz * hx(j,i) * gzitakh(k) - &
                              zcx * zrom1u * (pai(j,i,k) - pai(j-1,i,k))
                 end do
@@ -1197,7 +1210,7 @@ module mod_moloch
                      deltaw(j,i,k)   + deltaw(j,i,k+1)) + egrav * dts
                   zrom1v = d_half * cpd * (tetav(j,i-1,k) + tetav(j,i,k))
                   zcor1v = corv(j,i) * dts * 0.25_rkx * &
-                       (u(j,i,k) + u(j,i-1,k) + u(j+1,i,k) + u(j+1,i-1,k))
+                       (ud(j,i,k) + ud(j,i-1,k) + ud(j+1,i,k) + ud(j+1,i-1,k))
                   ! Equation 18
                   v(j,i,k) = v(j,i,k) - zcor1v - &
                              zfz * hy(j,i) * gzitakh(k) -  &
@@ -1207,17 +1220,6 @@ module mod_moloch
             end do
 !$acc end parallel
           end if
-!$acc parallel present(u, ud)
-!$acc loop collapse(3)
-          do k = 1 , kz
-            do i = ici1 , ici2
-              do j = jdi1 , jdi2
-                u(j,i,k) = ud(j,i,k)
-              end do
-            end do
-          end do
-!$acc end parallel
-
         end do ! sound loop
 
         ! complete computation of generalized vertical velocity
