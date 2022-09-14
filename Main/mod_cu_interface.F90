@@ -106,8 +106,8 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: c2m_q_detr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_rain_cc
 
-  real(rkx) , pointer , dimension(:,:,:),: :: c2m_qxten
-  real(rkx) , pointer , dimension(:,:,:),: :: c2m_chiten
+  real(rkx) , pointer , dimension(:,:,:,:) :: c2m_qxten
+  real(rkx) , pointer , dimension(:,:,:,:) :: c2m_chiten
 
   ! Midlevel convection top pressure for Tiedtke iconv = 1
   real(rkx) , parameter :: cmcptop = 30000.0_rkx
