@@ -99,10 +99,10 @@ module mod_moloch
   real(rkx) , dimension(:,:,:) , pointer :: tdiag_lsc
   real(rkx) , dimension(:,:,:) , pointer :: tdiag_tbl
   real(rkx) , dimension(:,:,:) , pointer :: qdiag_con
+  real(rkx) , dimension(:,:,:) , pointer :: qdiag_lsc
+  real(rkx) , dimension(:,:,:) , pointer :: qdiag_tbl
   real(rkx) , dimension(:,:,:,:) , pointer :: qxten
   real(rkx) , dimension(:,:,:,:) , pointer :: chiten
-  real(rkx) , dimension(:,:,:,:) , pointer :: qdiag_lsc
-  real(rkx) , dimension(:,:,:,:) , pointer :: qdiag_tbl
 
   public :: allocate_moloch , init_moloch , moloch
   public :: uvstagtox , xtouvstag , wstagtox
