@@ -95,10 +95,12 @@ module mod_cu_common
     if ( ichem == 1 ) then
       call getmem4d(cu_chiten,jci1,jci2,ici1,ici2,1,kz,1,ntr,'cumulus:chiten')
       call getmem3d(cu_convpr,jci1,jci2,ici1,ici2,1,kz,'cumulus:convpr')
+!$acc enter data create(cu_convpr)
     end if
     if ( any(icup == 5) ) then
       call getmem3d(cu_qdetr,jdi1,jdi2,idi1,idi2,1,kz,'cumulus:qdetr')
       call getmem3d(cu_raincc,jdi1,jdi2,idi1,idi2,1,kz,'cumulus:raincc')
+!$acc enter data create(cu_raincc)
     end if
     if ( any(icup == 5) .or. any(icup == 6) ) then
       call getmem3d(avg_ww,jci1,jci2,ici1,ici2,1,kz,'cumulus:avg_ww')
@@ -130,7 +132,7 @@ module mod_cu_common
         cld_profile = fixed_cld_profile
       end if
     end if
-!$acc update device(avg_ww)
+!$acc update device(avg_ww, cu_convpr, cu_raincc)
   end subroutine init_mod_cumulus
 
   subroutine model_cumulus_cloud(m2c)

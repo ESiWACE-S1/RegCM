@@ -94,9 +94,20 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:) :: c2m_rainc
   real(rkx) , pointer , dimension(:,:) :: c2m_kcumtop
   real(rkx) , pointer , dimension(:,:) :: c2m_kcumbot
+  real(rkx) , pointer , dimension(:,:) :: m2c_psb
+  real(rkx) , pointer , dimension(:,:) :: m2c_psdotb
+
   real(rkx) , pointer , dimension(:,:,:) :: m2c_was
   real(rkx) , pointer , dimension(:,:,:) :: m2c_wpas
   real(rkx) , pointer , dimension(:,:,:) :: c2m_tten
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_vten
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_uten
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_convpr
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_q_detr
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_rain_cc
+
+  real(rkx) , pointer , dimension(:,:,:),: :: c2m_qxten
+  real(rkx) , pointer , dimension(:,:,:),: :: c2m_chiten
 
   ! Midlevel convection top pressure for Tiedtke iconv = 1
   real(rkx) , parameter :: cmcptop = 30000.0_rkx
@@ -135,6 +146,8 @@ module mod_cu_interface
         call getmem3d(utend,jdi1ga,jdi2ga,idi1ga,idi2ga,1,kz,'pbl_common:utend')
         call getmem3d(vtend,jdi1ga,jdi2ga,idi1ga,idi2ga,1,kz,'pbl_common:vtend')
       end if
+!$acc enter data create(utend)
+!$acc enter data create(vtend)
     end if
     if ( any(icup == 4) ) then
       call allocate_mod_cu_em
@@ -160,8 +173,12 @@ module mod_cu_interface
     call assignpnt(mddom%ht,m2c%ht)
     call assignpnt(mddom%ldmsk,m2c%ldmsk)
     call assignpnt(sfs%psb,m2c%psb)
+    call assignpnt(m2c%psb, m2c_psb)
+!$acc enter data create(m2c_psb)
     call assignpnt(sfs%psa,m2c%psa)
     call assignpnt(sfs%psdotb,m2c%psdotb)
+    call assignpnt(m2c%psdotb, m2c_psdotb)
+!$acc enter data create(m2c_psdotb)
     call assignpnt(atms%za,m2c%zas)
     call assignpnt(atms%zq,m2c%zfs)
     call assignpnt(atms%dzq,m2c%dzq)
@@ -205,9 +222,19 @@ module mod_cu_interface
       call assignpnt(c2m%tten,c2m_tten)
 !$acc enter data create(c2m_tten)
       call assignpnt(mo_atm%uten,c2m%uten)
+      call assignpnt(c2m%uten, c2m_uten)
+!$acc enter data create(c2m_uten)
       call assignpnt(mo_atm%vten,c2m%vten)
+      call assignpnt(c2m%vten, c2m_vten)
+!$acc enter data create(c2m_vten)
       call assignpnt(mo_atm%qxten,c2m%qxten)
-      if ( ichem == 1 ) call assignpnt(mo_atm%chiten,c2m%chiten)
+      call assignpnt(c2m%qxten, c2m_qxten)
+!$acc enter data create(c2m_qxten)
+      if ( ichem == 1 ) then
+        call assignpnt(mo_atm%chiten,c2m%chiten)
+        call assignpnt(c2m%chiten, c2m_chiten)
+!$acc enter data create(c2m_chiten)
+      end if
     else
       call assignpnt(aten%t,m2c%tten,pc_physic)
       call assignpnt(aten%qx,m2c%qxten,pc_physic)
@@ -236,14 +263,21 @@ module mod_cu_interface
     call assignpnt(icumbot,c2m%kcumbot)
     call assignpnt(c2m%kcumbot,c2m_kcumbot)
 !$acc enter data create(c2m_kcumbot)
-    if ( ichem == 1 ) call assignpnt(convpr,c2m%convpr)
+    if ( ichem == 1 ) then
+      call assignpnt(convpr,c2m%convpr)
+      call assignpnt(c2m%convpr, c2m_convpr)
+    end if
     call assignpnt(q_detr,c2m%q_detr)
+    call assignpnt(c2m%q_detr, c2m_q_detr)
+!$acc enter data create(c2m_q_detr)
     call assignpnt(rain_cc,c2m%rain_cc)
+    call assignpnt(c2m%rain_cc, c2m_rain_cc)
+!$acc enter data create(c2m_rain_cc)
     call assignpnt(crrate,c2m%trrate)
     call assignpnt(c2m%trrate,c2m_trrate)
 
     call init_mod_cumulus
-!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten)
+!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb)
   end subroutine init_cumulus
 
   subroutine cucloud
@@ -367,8 +401,10 @@ module mod_cu_interface
               call uvdot2cross(utend,vtend,utenx,vtenx)
             end if
           end if
+!$acc kernels present(utend, vtend)
           utend = d_zero
           vtend = d_zero
+!$acc end kernels
         end if
 !$acc kernels present(cu_qten, cu_cldfrc)
         cu_qten(:,:,:,:) = d_zero
@@ -479,118 +515,149 @@ module mod_cu_interface
 !$acc end parallel
 
         if ( any(icup == 5) .or. any(icup == 4) ) then
+!$acc parallel present(c2m_vten, vtend, c2m_uten, utend)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = idi1 , idi2
               do j = jci1 , jci2
-                c2m%vten(j,i,k) = c2m%vten(j,i,k) + vtend(j,i,k)
+                c2m_vten(j,i,k) = c2m_vten(j,i,k) + vtend(j,i,k)
               end do
             end do
           end do
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jdi1 , jdi2
-                c2m%uten(j,i,k) = c2m%uten(j,i,k) + utend(j,i,k)
+                c2m_uten(j,i,k) = c2m_uten(j,i,k) + utend(j,i,k)
               end do
             end do
           end do
+!$acc end parallel
         end if
 
+!$acc parallel present(c2m_qxten, cu_qten)
+!$acc loop collapse(4)
         do n = 1 , nqx
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
-                c2m%qxten(j,i,k,n) = c2m%qxten(j,i,k,n) + cu_qten(j,i,k,n)
+                c2m_qxten(j,i,k,n) = c2m_qxten(j,i,k,n) + cu_qten(j,i,k,n)
               end do
             end do
           end do
         end do
+!$acc end parallel
 
         if ( ichem == 1 ) then
+!$acc parallel present(c2m_chiten, cu_chiten)
+!$acc loop collapse(4)
           do n = 1 , ntr
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
-                  c2m%chiten(j,i,k,n) = &
-                      c2m%chiten(j,i,k,n) + cu_chiten(j,i,k,n)
+                  c2m_chiten(j,i,k,n) = &
+                      c2m_chiten(j,i,k,n) + cu_chiten(j,i,k,n)
                 end do
               end do
             end do
           end do
+!$acc end parallel
         end if
 
       else
 
+!$acc parallel present(c2m_tten, cu_tten, m2c_psb)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              c2m%tten(j,i,k) = c2m%tten(j,i,k) + cu_tten(j,i,k) * m2c%psb(j,i)
+              c2m_tten(j,i,k) = c2m_tten(j,i,k) + cu_tten(j,i,k) * m2c_psb(j,i)
             end do
           end do
         end do
+!$acc end parallel
 
         if ( any(icup == 5) .or. any(icup == 4) ) then
+!$acc parallel present(c2m_uten, utend, m2c_psdotb, c2m_vten, vtend)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = idi1 , idi2
               do j = jdi1 , jdi2
-                c2m%uten(j,i,k) = c2m%uten(j,i,k) + utend(j,i,k)*m2c%psdotb(j,i)
-                c2m%vten(j,i,k) = c2m%vten(j,i,k) + vtend(j,i,k)*m2c%psdotb(j,i)
+                c2m_uten(j,i,k) = c2m_uten(j,i,k) + utend(j,i,k)*m2c_psdotb(j,i)
+                c2m_vten(j,i,k) = c2m_vten(j,i,k) + vtend(j,i,k)*m2c_psdotb(j,i)
               end do
             end do
           end do
+!$acc end parallel
         end if
 
+!$acc parallel present(c2m_qxten, cu_qten, m2c_psb)
+!$acc loop collapse(4)
         do n = 1 , nqx
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
-                c2m%qxten(j,i,k,n) = c2m%qxten(j,i,k,n) + &
-                              cu_qten(j,i,k,n) * m2c%psb(j,i)
+                c2m_qxten(j,i,k,n) = c2m_qxten(j,i,k,n) + &
+                              cu_qten(j,i,k,n) * m2c_psb(j,i)
               end do
             end do
           end do
         end do
+!$acc end parallel
 
         if ( ichem == 1 ) then
+!$acc parallel present(c2m_chiten, cu_chiten, m2c_psb)
+!$acc loop collapse(4)
           do n = 1 , ntr
             do k = 1 , kz
               do i = ici1 , ici2
                 do j = jci1 , jci2
-                  c2m%chiten(j,i,k,n) = c2m%chiten(j,i,k,n) + &
-                                   cu_chiten(j,i,k,n) * m2c%psb(j,i)
+                  c2m_chiten(j,i,k,n) = c2m_chiten(j,i,k,n) + &
+                                   cu_chiten(j,i,k,n) * m2c_psb(j,i)
                 end do
               end do
             end do
           end do
+!$acc end parallel
         end if
       end if
 
       if ( ichem == 1 ) then
+!$acc parallel present(c2m_convpr, cu_convpr)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              c2m%convpr(j,i,k) = cu_convpr(j,i,k)
+              c2m_convpr(j,i,k) = cu_convpr(j,i,k)
             end do
           end do
         end do
+!$acc end parallel
       end if
 
       if ( any(icup == 5) ) then
         if ( ipptls == 2 ) then
+!$acc parallel present(c2m_q_detr, cu_qdetr)
+!$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
               do j = jci1 , jci2
-                c2m%q_detr(j,i,k) = cu_qdetr(j,i,k) * dt
+                c2m_q_detr(j,i,k) = cu_qdetr(j,i,k) * dt
               end do
             end do
           end do
+!$acc end parallel
         end if
+!$acc parallel present(c2m_rain_cc, cu_raincc)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              c2m%rain_cc(j,i,k) = cu_raincc(j,i,k)
+              c2m_rain_cc(j,i,k) = cu_raincc(j,i,k)
             end do
           end do
         end do
+!$acc end parallel
       end if
     end if
   end subroutine cumulus
@@ -624,7 +691,7 @@ module mod_cu_interface
           do i = ici1 , ici2
             do j = jci1 , jci2
               aten%t(j,i,k,pc_total) = aten%t(j,i,k,pc_total) + &
-                          cu_tten(j,i,k) * m2c%psb(j,i)
+                          cu_tten(j,i,k) * m2c_psb(j,i)
             end do
           end do
         end do
@@ -632,7 +699,7 @@ module mod_cu_interface
           do i = ici1 , ici2
             do j = jci1 , jci2
               aten%qx(j,i,k,iqv,pc_total) = aten%qx(j,i,k,iqv,pc_total) + &
-                          cu_qten(j,i,k,iqv) * m2c%psb(j,i)
+                          cu_qten(j,i,k,iqv) * m2c_psb(j,i)
             end do
           end do
         end do
