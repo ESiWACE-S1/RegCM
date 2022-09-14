@@ -92,8 +92,8 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:) :: c2m_pcratec
   real(rkx) , pointer , dimension(:,:) :: c2m_trrate
   real(rkx) , pointer , dimension(:,:) :: c2m_rainc
-  real(rkx) , pointer , dimension(:,:) :: c2m_kcumtop
-  real(rkx) , pointer , dimension(:,:) :: c2m_kcumbot
+  integer(ik4) , pointer , dimension(:,:) :: c2m_kcumtop
+  integer(ik4) , pointer , dimension(:,:) :: c2m_kcumbot
   real(rkx) , pointer , dimension(:,:) :: m2c_psb
   real(rkx) , pointer , dimension(:,:) :: m2c_psdotb
 
