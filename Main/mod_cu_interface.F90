@@ -275,6 +275,7 @@ module mod_cu_interface
 !$acc enter data create(c2m_rain_cc)
     call assignpnt(crrate,c2m%trrate)
     call assignpnt(c2m%trrate,c2m_trrate)
+!$acc enter data create(c2m_trrate)
 
     call init_mod_cumulus
 !$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb)
