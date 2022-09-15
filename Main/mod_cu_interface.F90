@@ -412,12 +412,16 @@ module mod_cu_interface
         cu_cldfrc(:,:,:) = d_zero
 !$acc end kernels
         if ( ichem == 1 ) then
+!$acc kernels present(cu_chiten, cu_convpr)
           cu_chiten(:,:,:,:) = d_zero
           cu_convpr(:,:,:) = d_zero
+!$acc end kernels
         end if
         if ( any(icup == 5) ) then
+!$acc kernels present(cu_qdetr, cu_raincc)
           cu_qdetr(:,:,:) = d_zero
           cu_raincc(:,:,:) = d_zero
+!$acc end kernels
         end if
 
         total_precip_points = 0
