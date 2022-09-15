@@ -99,6 +99,7 @@ module mod_cu_common
     end if
     if ( any(icup == 5) ) then
       call getmem3d(cu_qdetr,jdi1,jdi2,idi1,idi2,1,kz,'cumulus:qdetr')
+!$acc enter data create(cu_qdetr)
       call getmem3d(cu_raincc,jdi1,jdi2,idi1,idi2,1,kz,'cumulus:raincc')
 !$acc enter data create(cu_raincc)
     end if
