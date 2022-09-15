@@ -105,9 +105,14 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: c2m_convpr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_q_detr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_rain_cc
+  real(rkx) , pointer , dimension(:,:,:) :: mo_atm_tten
 
   real(rkx) , pointer , dimension(:,:,:,:) :: c2m_qxten
   real(rkx) , pointer , dimension(:,:,:,:) :: c2m_chiten
+  real(rkx) , pointer , dimension(:,:,:,:) :: mo_atm_qxten
+  real(rkx) , pointer , dimension(:,:,:,:) :: aten_t
+
+  real(rkx) , pointer , dimension(:,:,:,:,:) :: aten_qx
 
   ! Midlevel convection top pressure for Tiedtke iconv = 1
   real(rkx) , parameter :: cmcptop = 30000.0_rkx
@@ -213,6 +218,10 @@ module mod_cu_interface
     call assignpnt(heatrt,m2c%heatrt)
     ! Pass dynamic tendencies as input.
     if ( idynamic == 3 ) then
+      call assignpnt(mo_atm%tten, mo_atm_tten)
+!$acc enter data create(mo_atm_tten)
+      call assignpnt(mo_atm%qxten, mo_atm_qxten)
+!$acc enter data create(mo_atm_qxten)
       call assignpnt(mo_atm%tten,m2c%tten)
       call assignpnt(mo_atm%qxten,m2c%qxten)
       call assignpnt(mo_atm%uten,m2c%uten)
@@ -236,6 +245,10 @@ module mod_cu_interface
 !$acc enter data create(c2m_chiten)
       end if
     else
+      call assignpnt(aten%t, aten_t)
+!$acc enter data create(aten_t)
+      call assignpnt(aten%qx,aten_qx)
+!$acc enter data create(aten_qx)
       call assignpnt(aten%t,m2c%tten,pc_physic)
       call assignpnt(aten%qx,m2c%qxten,pc_physic)
       call assignpnt(aten%qx,m2c%dynqx,pc_dynamic)
@@ -677,37 +690,45 @@ module mod_cu_interface
       call shallcu(m2c)
 
       if ( idynamic == 3 ) then
+!$acc parallel present(mo_atm_tten, cu_tten, mo_atm_qxten, cu_qten)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              mo_atm%tten(j,i,k) = cu_tten(j,i,k)
+              mo_atm_tten(j,i,k) = cu_tten(j,i,k)
             end do
           end do
         end do
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              mo_atm%qxten(j,i,k,iqv) = cu_qten(j,i,k,iqv)
+              mo_atm_qxten(j,i,k,iqv) = cu_qten(j,i,k,iqv)
             end do
           end do
         end do
+!$acc end parallel
       else
+!$acc parallel present(aten_t, cu_tten, m2c_psb, aten_qx, cu_qten)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              aten%t(j,i,k,pc_total) = aten%t(j,i,k,pc_total) + &
+              aten_t(j,i,k,pc_total) = aten_t(j,i,k,pc_total) + &
                           cu_tten(j,i,k) * m2c_psb(j,i)
             end do
           end do
         end do
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              aten%qx(j,i,k,iqv,pc_total) = aten%qx(j,i,k,iqv,pc_total) + &
+              aten_qx(j,i,k,iqv,pc_total) = aten_qx(j,i,k,iqv,pc_total) + &
                           cu_qten(j,i,k,iqv) * m2c_psb(j,i)
             end do
           end do
         end do
+!$acc end parallel
       end if
 
     end if
