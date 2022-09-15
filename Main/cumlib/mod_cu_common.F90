@@ -94,6 +94,7 @@ module mod_cu_common
 !$acc enter data create(cu_kbot)
     if ( ichem == 1 ) then
       call getmem4d(cu_chiten,jci1,jci2,ici1,ici2,1,kz,1,ntr,'cumulus:chiten')
+!$acc enter data create(cu_chiten)
       call getmem3d(cu_convpr,jci1,jci2,ici1,ici2,1,kz,'cumulus:convpr')
 !$acc enter data create(cu_convpr)
     end if
