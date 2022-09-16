@@ -13696,9 +13696,13 @@ module mod_mppparam
     real(rkx) , intent(inout) , dimension(:,:,:) , pointer :: ux , vx
     integer(ik4) :: i , j , k
 
+!$ac update self(u, v)
     call exchange_lr(u,2,jdi1,jdi2,ici1,ici2,1,kz)
     call exchange_bt(v,2,jci1,jci2,idi1,idi2,1,kz)
+!$acc update device(u, v)
     ! Back to wind points
+!$acc parallel present(ux, u)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jcii1 , jcii2
@@ -13707,20 +13711,29 @@ module mod_mppparam
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdyleft ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           ux(jci1,i,k) = 0.5_rkx * (u(jdi1,i,k)+u(jdii1,i,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdyright ) then
+!$acc parallel present(ux, u)
+!$acc loop collapse(2)
       do k = 1 , kz
         do i = ici1 , ici2
           ux(jci2,i,k) = 0.5_rkx*(u(jdi2,i,k) + u(jdii2,i,k))
         end do
       end do
+!$acc end parallel
     end if
+!$acc parallel present(vx, v)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = icii1 , icii2
         do j = jci1 , jci2
@@ -13729,19 +13742,26 @@ module mod_mppparam
         end do
       end do
     end do
+!$acc end parallel
     if ( ma%has_bdybottom ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           vx(j,ici1,k) = 0.5_rkx * (v(j,idi1,k)+v(j,idii1,k))
         end do
       end do
+!$acc end parallel
     end if
     if ( ma%has_bdytop ) then
+!$acc parallel present(vx, v)
+!$acc loop collapse(2)
       do k = 1 , kz
         do j = jci1 , jci2
           vx(j,ici2,k) = 0.5_rkx*(v(j,idi2,k) + v(j,idii2,k))
         end do
       end do
+!$acc end parallel
     end if
   end subroutine uvtentotenx
 
@@ -13863,8 +13883,10 @@ module mod_mppparam
     real(rkx) , pointer , dimension(:,:,:) , intent(inout) :: ux , vx
     integer(ik4) :: i , j , k
 
+!$acc update self(ud, vd)
     call exchange(ud,1,jdi1,jdi2,idi1,idi2,1,kz)
     call exchange(vd,1,jdi1,jdi2,idi1,idi2,1,kz)
+!$acc update device(ud, vd)
 
     !
     !     o     o     o     o     o     o
@@ -13885,6 +13907,8 @@ module mod_mppparam
     ! Perform the bilinear interpolation necessary
     ! to put the u and v variables on the cross grid.
 
+!$acc parallel present(ux, vx, ud, vd)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -13895,6 +13919,7 @@ module mod_mppparam
         end do
       end do
     end do
+!$acc end parallel
   end subroutine uvdot2cross
 
   subroutine cross2dot2d(x,d)

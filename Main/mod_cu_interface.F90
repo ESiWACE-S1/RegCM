@@ -102,6 +102,8 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: c2m_tten
   real(rkx) , pointer , dimension(:,:,:) :: c2m_vten
   real(rkx) , pointer , dimension(:,:,:) :: c2m_uten
+  real(rkx) , pointer , dimension(:,:,:) :: m2c_vten
+  real(rkx) , pointer , dimension(:,:,:) :: m2c_uten
   real(rkx) , pointer , dimension(:,:,:) :: c2m_convpr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_q_detr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_rain_cc
@@ -225,7 +227,11 @@ module mod_cu_interface
       call assignpnt(mo_atm%tten,m2c%tten)
       call assignpnt(mo_atm%qxten,m2c%qxten)
       call assignpnt(mo_atm%uten,m2c%uten)
+      call assignpnt(m2c%uten,m2c_uten)
+!$acc enter data create(m2c_uten)
       call assignpnt(mo_atm%vten,m2c%vten)
+      call assignpnt(m2c%vten,m2c_vten)
+!$acc enter data create(m2c_vten)
       if ( ichem == 1 ) call assignpnt(mo_atm%chiten,m2c%chiten)
       call assignpnt(mo_atm%tten,c2m%tten)
       call assignpnt(c2m%tten,c2m_tten)
@@ -291,7 +297,7 @@ module mod_cu_interface
 !$acc enter data create(c2m_trrate)
 
     call init_mod_cumulus
-!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb)
+!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb, m2c_uten, m2c_vten)
   end subroutine init_cumulus
 
   subroutine cucloud
@@ -406,12 +412,16 @@ module mod_cu_interface
 !$acc end kernels
           if ( any(icup == 5) ) then
             if ( idynamic == 3 ) then
-              utend(jdi1:jdi2,ici1:ici2,:) = m2c%uten
-              vtend(jci1:jci2,idi1:idi2,:) = m2c%vten
+!$acc kernels present(utend, vtend, m2c_uten, m2c_vten)
+              utend(jdi1:jdi2,ici1:ici2,:) = m2c_uten
+              vtend(jci1:jci2,idi1:idi2,:) = m2c_vten
+!$acc end kernels
               call uvtentotenx(utend,vtend,utenx,vtenx)
             else
-              utend(jdi1:jdi2,idi1:idi2,:) = m2c%uten
-              vtend(jdi1:jdi2,idi1:idi2,:) = m2c%vten
+!$acc kernels present(utend, vtend, m2c_uten, m2c_vten)
+              utend(jdi1:jdi2,idi1:idi2,:) = m2c_uten
+              vtend(jdi1:jdi2,idi1:idi2,:) = m2c_vten
+!$acc end kernels
               call uvdot2cross(utend,vtend,utenx,vtenx)
             end if
           end if
