@@ -163,7 +163,9 @@ module mod_cu_interface
       if ( iconv /= 4 ) call init_convect_tables
       call allocate_mod_cu_tiedtke
       call getmem3d(utenx,jci1,jci2,ici1,ici2,1,kz,'pbl_common:utenx')
+!$acc enter data create(utenx)
       call getmem3d(vtenx,jci1,jci2,ici1,ici2,1,kz,'pbl_common:vtenx')
+!$acc enter data create(vtenx)
     end if
     if ( any(icup == 6) ) then
       call allocate_mod_cu_kf
@@ -297,7 +299,7 @@ module mod_cu_interface
 !$acc enter data create(c2m_trrate)
 
     call init_mod_cumulus
-!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb, m2c_uten, m2c_vten)
+!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb, m2c_uten, m2c_vten, utenx, vtenx)
   end subroutine init_cumulus
 
   subroutine cucloud
