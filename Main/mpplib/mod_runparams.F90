@@ -556,6 +556,7 @@ module mod_runparams
       call getmem1d(bk,1,kz,'mod_runparams:bk')
     end if
     call getmem1d(dsigma,1,kz,'mod_runparams:dsigma')
+!$acc enter data create(dsigma)
     call getmem1d(hsigma,1,kz,'mod_runparams:hsigma')
     call getmem1d(sigma,1,kzp1,'mod_runparams:sigma')
     call getmem1d(qcon,1,kz,'mod_runparams:qcon')
@@ -605,5 +606,6 @@ module mod_runparams
     end if
   end subroutine exponential_nudging
 
+!$acc update device(dsigma)
 end module mod_runparams
 ! vim: tabstop=8 expandtab shiftwidth=2 softtabstop=2

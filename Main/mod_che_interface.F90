@@ -83,6 +83,7 @@ module mod_che_interface
     implicit none
 
     call assignpnt(icumtop,kcumtop)
+!$acc enter data create(kcumtop)
     call assignpnt(icumbot,kcumbot)
     call assignpnt(atms%tb3d,ctb3d)
     call assignpnt(atms%qxb3d,cqxb3d)

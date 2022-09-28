@@ -1846,7 +1846,7 @@ module mod_moloch
 !$acc end kernels
           end if
           if ( ichem == 1 .and. ichdiag > 0 ) then
-!$acc kernels present(chiten0, chiten)
+!$acc kernels present(cconvdiag, chiten0, chiten)
             cconvdiag = chiten(jci1:jci2,ici1:ici2,:,:) - chiten0
 !$acc end kernels
           end if

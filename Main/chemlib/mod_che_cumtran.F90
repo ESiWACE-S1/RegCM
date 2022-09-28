@@ -48,12 +48,18 @@ module mod_che_cumtran
     implicit none
     integer(ik4) :: i , j
     call getmem2d(dotran,jci1,jci2,ici1,ici2,'cumtran:dotran')
+!$acc enter data create(dotran)
     if ( ichdiag > 0 ) then
       call getmem4d(chiten0,jci1,jci2, &
                             ici1,ici2,1,kz,1,ntr,'che_common:chiten0')
+!$ac enter data create(chiten0)
     end if
+!$acc kernels present(dotran)
     dotran(:,:) = .false.
+!$acc end kernels
     ! Emanuel anf Tiedtke do their transport internally
+!$acc parallel present(dotran)
+!$acc loop collapse(2)
     do i = ici1 , ici2
       do j = jci1 , jci2
         if ( cveg2d(j,i) == 14 .or. cveg2d(j,i) == 15 ) then
@@ -67,6 +73,8 @@ module mod_che_cumtran
         end if
       end do
     end do
+!$acc end parallel
+!$acc update device(chiten0)
   end subroutine init_cumtran
 
   subroutine cumtran1(mxc)
@@ -76,13 +84,18 @@ module mod_che_cumtran
     integer(ik4) :: i , j , k , kctop , n
 
     if ( ichdiag > 0 ) then
+!$acc parallel present(chiten0, mxc)
+!$acc loop collapse(2)
       do j = jci1 , jci2
         do i = ici1 , ici2
          chiten0(j,i,:,:) = mxc(j,i,:,:)
         end do
       end do
+!$acc end parallel
     end if
 
+!$acc parallel present(mxc, dotran, kcumtop, dsigma, convcdlfra) private(deltas, chibar, kctop, cumfrc)
+!$acc loop collapse(3)
     do n = 1 , ntr
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -104,15 +117,19 @@ module mod_che_cumtran
         end do
       end do
     end do
+!$acc end parallel
     ! here calculate a pseudo tendency.
     ! factor 2 is added since we are out of leap frog
     if ( ichdiag > 0 ) then
+!$acc parallel present(cconvdiag, mxc, chiten0)
+!$acc loop collapse(2)
       do j = jci1 , jci2
         do i = ici1 , ici2
           cconvdiag(j,i,:,:) = cconvdiag(j,i,:,:) + &
             (mxc(j,i,:,:) - chiten0(j,i,:,:))/dt * d_two * cfdout
        end do
       end do
+!$acc end parallel
     end if
   end subroutine cumtran1
 
@@ -123,13 +140,18 @@ module mod_che_cumtran
     integer(ik4) :: i , j , k , kctop , n
 
     if ( ichdiag > 0 ) then
+!$acc parallel present(chiten0, bmxc)
+!$acc loop collapse(2)
       do j = jci1 , jci2
         do i = ici1 , ici2
          chiten0(j,i,:,:) = bmxc(j,i,:,:)
         end do
       end do
+!$acc end parallel
     end if
 
+!$acc parallel present(amxc, bmxc, dotran, kcumtop, dsigma, convcdlfra) private(deltas, chibaar, chibbar, kctop, cumfrc)
+!$acc loop collapse(3)
     do n = 1 , ntr
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -155,8 +177,11 @@ module mod_che_cumtran
         end do
       end do
     end do
+!$ac end parallel
     ! here calculate a pseudo tendency.
     ! factor 2 is added since we are out of leap frog
+!$acc parallel present(cconvdiag, bmxc, chiten0)
+!$acc loop collapse(2)
     if ( ichdiag > 0 ) then
       do j = jci1 , jci2
         do i = ici1 , ici2
@@ -164,6 +189,7 @@ module mod_che_cumtran
             (bmxc(j,i,:,:) - chiten0(j,i,:,:))/dt * d_two * cfdout
        end do
       end do
+!$acc end parallel
     end if
   end subroutine cumtran2
 
