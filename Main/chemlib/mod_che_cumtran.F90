@@ -177,7 +177,7 @@ module mod_che_cumtran
         end do
       end do
     end do
-!$ac end parallel
+!$acc end parallel
     ! here calculate a pseudo tendency.
     ! factor 2 is added since we are out of leap frog
     if ( ichdiag > 0 ) then
