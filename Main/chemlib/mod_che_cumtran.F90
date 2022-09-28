@@ -94,7 +94,7 @@ module mod_che_cumtran
 !$acc end parallel
     end if
 
-!$acc parallel present(mxc, dotran, kcumtop, dsigma, convcdlfra) private(deltas, chibar, kctop, cumfrc)
+!$acc parallel present(mxc, dotran, kcumtop, dsigma, convcldfra) private(deltas, chibar, kctop, cumfrc)
 !$acc loop collapse(3)
     do n = 1 , ntr
       do i = ici1 , ici2
@@ -150,7 +150,7 @@ module mod_che_cumtran
 !$acc end parallel
     end if
 
-!$acc parallel present(amxc, bmxc, dotran, kcumtop, dsigma, convcdlfra) private(deltas, chibaar, chibbar, kctop, cumfrc)
+!$acc parallel present(amxc, bmxc, dotran, kcumtop, dsigma, convcldfra) private(deltas, chiabar, chibbar, kctop, cumfrc)
 !$acc loop collapse(3)
     do n = 1 , ntr
       do i = ici1 , ici2
@@ -180,9 +180,9 @@ module mod_che_cumtran
 !$ac end parallel
     ! here calculate a pseudo tendency.
     ! factor 2 is added since we are out of leap frog
+    if ( ichdiag > 0 ) then
 !$acc parallel present(cconvdiag, bmxc, chiten0)
 !$acc loop collapse(2)
-    if ( ichdiag > 0 ) then
       do j = jci1 , jci2
         do i = ici1 , ici2
           cconvdiag(j,i,:,:) = cconvdiag(j,i,:,:) + &
