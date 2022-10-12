@@ -2019,6 +2019,9 @@ module mod_moloch
 !$acc end kernels
           end if
         end if
+        !------------------------------------------------------------- 
+        !call chemistry/aerosol schemes 
+        !----------------------------------------------------------------------
         if ( ichem == 1 ) then
           call tractend2(rcmtimer%month,rcmtimer%day,declin)
         end if
