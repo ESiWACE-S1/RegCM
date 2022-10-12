@@ -1928,6 +1928,9 @@ module mod_moloch
                  mo_atm%qxten(jci1:jci2,ici1:ici2,:,iqv) - qen0
           end if
         end if
+        !------------------------------------------------------------- 
+        !call chemistry/aerosol schemes 
+        !----------------------------------------------------------------------
         if ( ichem == 1 ) then
           call tractend2(rcmtimer%month,rcmtimer%day,declin)
         end if
