@@ -108,6 +108,9 @@ module mod_cu_interface
   real(rkx) , pointer , dimension(:,:,:) :: c2m_q_detr
   real(rkx) , pointer , dimension(:,:,:) :: c2m_rain_cc
   real(rkx) , pointer , dimension(:,:,:) :: mo_atm_tten
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_cldfrc
+  real(rkx) , pointer , dimension(:,:,:) :: c2m_cldlwc
+  real(rkx) , pointer , dimension(:,:,:) :: m2c_tas
 
   real(rkx) , pointer , dimension(:,:,:,:) :: c2m_qxten
   real(rkx) , pointer , dimension(:,:,:,:) :: c2m_chiten
@@ -195,6 +198,8 @@ module mod_cu_interface
     call assignpnt(atms%pb3d,m2c%pas)
     call assignpnt(atms%pf3d,m2c%pasf)
     call assignpnt(atms%tb3d,m2c%tas)
+    call assignpnt(m2c%tas,m2c_tas)
+!$acc enter data create(m2c_tas)
     call assignpnt(atms%ubx3d,m2c%uas)
     call assignpnt(atms%vbx3d,m2c%vas)
     call assignpnt(atms%wpx3d,m2c%wpas)
@@ -277,7 +282,11 @@ module mod_cu_interface
     call assignpnt(c2m%pcratec, c2m_pcratec)
 !$acc enter data create(c2m_pcratec)
     call assignpnt(cldfra,c2m%cldfrc)
+    call assignpnt(c2m%cldfrc,c2m_cldfrc)
+!$acc enter data create(c2m_cldfrc)
     call assignpnt(cldlwc,c2m%cldlwc)
+    call assignpnt(c2m%cldlwc,c2m_cldlwc)
+!$acc enter data create(c2m_cldlwc)
     call assignpnt(icumtop,c2m%kcumtop)
     call assignpnt(c2m%kcumtop,c2m_kcumtop)
 !$acc enter data create(c2m_kcumtop)
@@ -299,7 +308,7 @@ module mod_cu_interface
 !$acc enter data create(c2m_trrate)
 
     call init_mod_cumulus
-!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb, m2c_uten, m2c_vten, utenx, vtenx)
+!$acc update device(m2c_was, m2c_wpas, c2m_pcratec, c2m_rainc, c2m_tten, c2m_vten, c2m_uten, c2m_qxten, c2m_chiten, m2c_psb, m2c_psdotb, m2c_uten, m2c_vten, utenx, vtenx, m2c_tas)
   end subroutine init_cumulus
 
   subroutine cucloud
@@ -308,18 +317,21 @@ module mod_cu_interface
     if ( any(icup == 1) .or. any(icup == 3) ) then
       call model_cumulus_cloud(m2c)
     end if
+!$acc parallel present(c2m_cldfrc, cu_cldfrc, c2m_cldlwc, m2c_tas)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
-          c2m%cldfrc(j,i,k) = max(cu_cldfrc(j,i,k),0.0_rkx)
+          c2m_cldfrc(j,i,k) = max(cu_cldfrc(j,i,k),0.0_rkx)
           if ( cu_cldfrc(j,i,k) > 0.001_rkx ) then
-            c2m%cldlwc(j,i,k) = clwfromt(m2c%tas(j,i,k))
+            c2m_cldlwc(j,i,k) = clwfromt(m2c_tas(j,i,k))
           else
-            c2m%cldlwc(j,i,k) = d_zero
+            c2m_cldlwc(j,i,k) = d_zero
           end if
         end do
       end do
     end do
+!$acc end parallel
 
     contains
 
