@@ -65,9 +65,9 @@ module mod_micro_interface
   real(rkx) , pointer , dimension(:,:,:) :: mc2mo_fcc
   real(rkx) , pointer , dimension(:,:,:) :: mo2mc_t
   real(rkx) , pointer , dimension(:,:,:) :: mo2mc_rho
-  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_ldmsk
+  integer(ik4) , pointer , dimension(:,:) :: mo2mc_ldmsk
   real(rkx) , pointer , dimension(:,:,:) :: mo2mc_z
-  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_ps2
+  real(rkx) , pointer , dimension(:,:) :: mo2mc_ps2
   integer(ik4) , pointer , dimension(:,:) :: mo2mc_iveg
   real(rkx) , pointer , dimension(:,:) :: atms_th700
   real(rkx) , pointer , dimension(:,:,:) :: atms_th3d
@@ -206,7 +206,7 @@ module mod_micro_interface
       call assignpnt(mo2mc%qsn,mo2mc_qsn)
 !$acc enter data create(mo2mc_qsn)
       call assignpnt(atms%qxb3d,mo2mc%qrn,iqr)
-      call assignpnt(mo2cm%qrn,mo2mc_qrn)
+      call assignpnt(mo2mc%qrn,mo2mc_qrn)
 !$acc enter data create(mo2cm_qrn)
     end if
 
@@ -416,7 +416,7 @@ module mod_micro_interface
 !$acc end parallel
     else
       if ( any(icup > 1) ) then
-!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldfra, cldwc) private(exlwc, ichi)
+!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldfra, cldlwc) private(exlwc, ichi)
 !$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
