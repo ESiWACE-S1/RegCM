@@ -55,6 +55,8 @@ module mod_cloud_texeira
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(qc, qs, rh, rh0, fcc) private(rhrng, liq, spq)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -72,6 +74,7 @@ module mod_cloud_texeira
         end do
       end do
     end do
+!$acc end parallel
 
   end subroutine texeira_cldfrac
 

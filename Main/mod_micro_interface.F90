@@ -54,6 +54,24 @@ module mod_micro_interface
   ! rh0adj - Adjusted relative humidity threshold
   real(rkx) , pointer , dimension(:,:,:) :: totc , rh0adj
 
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qcn
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qin
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qrn
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qsn
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_phs
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qvn
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_qs
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_rh
+  real(rkx) , pointer , dimension(:,:,:) :: mc2mo_fcc
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_t
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_rho
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_ldmsk
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_z
+  real(rkx) , pointer , dimension(:,:,:) :: mo2mc_ps2
+  integer(ik4) , pointer , dimension(:,:) :: mo2mc_iveg
+  real(rkx) , pointer , dimension(:,:) :: atms_th700
+  real(rkx) , pointer , dimension(:,:,:) :: atms_th3d
+
   real(rkx) , parameter :: alphaice = d_one
 
   integer(ik4) , parameter :: nchi = 256
@@ -70,6 +88,7 @@ module mod_micro_interface
     if ( ipptls == 1 ) then
       call allocate_subex
       call getmem3d(rh0adj,jci1,jci2,ici1,ici2,1,kz,'micro:rh0adj')
+!$acc enter data create(rh0adj)
     else if ( ipptls == 2 ) then
       call allocate_mod_nogtom
 #ifdef DEBUG
@@ -115,10 +134,15 @@ module mod_micro_interface
     end if
     call getmem2d(rh0,jci1,jci2,ici1,ici2,'subex:rh0')
     call getmem3d(totc,jci1,jci2,ici1,ici2,1,kz,'subex:totc')
+!$acc enter data create(totc)
+!$acc enter data create(chis)
+!$acc parallel present(chis)
+!$acc loop
     do i = 1 , nchi
       cf = real(i-1,rkx)/real(nchi-1,rkx)
       chis(i-1) = 0.97_rkx*exp(-((cf-0.098_rkx)**2)/0.0365_rkx)+0.255_rkx
     end do
+!$acc end parallel
   end subroutine allocate_micro
 
   subroutine init_micro
@@ -126,32 +150,64 @@ module mod_micro_interface
     use mod_che_interface
     implicit none
 
+    call assignpnt(atms%th700,atms_th700)
+!$acc enter data create(atms_th700)
+    call assignpnt(atms%th3d,atms_th3d)
+!$acc enter data create(atms_th3d)
     call assignpnt(mddom%ldmsk,mo2mc%ldmsk)
+    call assignpnt(mo2mc%ldmsk,mo2mc_ldmsk)
+!$acc enter data create(mo2mc_ldmsk)
     call assignpnt(mddom%iveg,mo2mc%iveg)
+    call assignpnt(mo2mc%iveg,mo2mc_iveg)
+!$acc enter data create(mo2mc_iveg)
     call assignpnt(mddom%xlat,mo2mc%xlat)
     call assignpnt(sfs%psb,mo2mc%psb)
     call assignpnt(atms%pb3d,mo2mc%phs)
+    call assignpnt(mo2mc%phs,mo2mc_phs)
+!$acc enter data create(mo2mc_phs)
     call assignpnt(atms%pf3d,mo2mc%pfs)
     call assignpnt(atms%tb3d,mo2mc%t)
+    call assignpnt(mo2mc%t,mo2mc_t)
+!$acc enter data create(mo2mc_t)
     call assignpnt(atms%za,mo2mc%z)
+    call assignpnt(mo2mc%z,mo2mc_z)
+!$acc enter data create(mo2mc_z)
     call assignpnt(atms%dzq,mo2mc%delz)
     call assignpnt(atms%wpx3d,mo2mc%pverv)
     call assignpnt(atms%wb3d,mo2mc%verv)
     call assignpnt(atms%qxb3d,mo2mc%qxx)
     call assignpnt(atms%rhob3d,mo2mc%rho)
+    call assignpnt(mo2mc%rho,mo2mc_rho)
+!$acc enter data create(mo2mc_rho)
     call assignpnt(atms%rhb3d,mo2mc%rh)
+    call assignpnt(mo2mc%rh,mo2mc_rh)
+!$acc enter data create(mo2mc_rh)
     call assignpnt(atms%qsb3d,mo2mc%qs)
+    call assignpnt(mo2mc%qs,mo2mc_qs)
+!$acc enter data create(mo2mc_qs)
     call assignpnt(atms%ps2d,mo2mc%ps2)
+    call assignpnt(mo2mc%ps2,mo2mc_ps2)
+!$acc enter data create(mo2mc_ps2)
     call assignpnt(heatrt,mo2mc%heatrt)
     call assignpnt(q_detr,mo2mc%qdetr)
     call assignpnt(cldfra,mo2mc%cldf)
 
     call assignpnt(atms%qxb3d,mo2mc%qvn,iqv)
+    call assignpnt(mo2mc%qvn,mo2mc_qvn)
+!$acc enter data create(mo2mc_qvn)
     call assignpnt(atms%qxb3d,mo2mc%qcn,iqc)
+    call assignpnt(mo2mc%qcn,mo2mc_qcn)
+!$acc enter data create(mo2mc_qcn)
     if ( ipptls > 1 ) then
       call assignpnt(atms%qxb3d,mo2mc%qin,iqi)
+      call assignpnt(mo2mc%qin,mo2mc_qin)
+!$acc enter data create(mo2mc_qin)
       call assignpnt(atms%qxb3d,mo2mc%qsn,iqs)
+      call assignpnt(mo2mc%qsn,mo2mc_qsn)
+!$acc enter data create(mo2mc_qsn)
       call assignpnt(atms%qxb3d,mo2mc%qrn,iqr)
+      call assignpnt(mo2cm%qrn,mo2mc_qrn)
+!$acc enter data create(mo2cm_qrn)
     end if
 
     if ( ichem == 1 ) then
@@ -166,6 +222,8 @@ module mod_micro_interface
     end if
 
     call assignpnt(fcc,mc2mo%fcc)
+    call assignpnt(mc2mo%fcc,mc2mo_fcc)
+!$acc enter data create(mc2mo_fcc)
     if ( idynamic == 3 ) then
       call assignpnt(mo_atm%tten,mc2mo%tten)
       call assignpnt(mo_atm%qxten,mc2mo%qxten)
@@ -191,6 +249,7 @@ module mod_micro_interface
       case default
         return
     end select
+!$acc update device(mo2mc_qcn, mo2mc_qin, mo2cm_qrn, mo2cm_qsn, mo2mc_phs, mo2mc_qvn, mo2mc_qs, mo2mc_rh, mc2mo_fcc, mo2mc_t, mo2mc_rho, mo2mc_ldmsk, mo2mc_z, mo2mc_ps2, mo2mc_iveg, atms_th700, atms_th3d)
   end subroutine init_micro
 
   subroutine microscheme
@@ -224,52 +283,61 @@ module mod_micro_interface
 
     if ( ipptls > 1 ) then
       if ( icldfrac == 3 ) then
+!$acc parallel present(totc, mo2mc_qcn, mo2mc_qin, mo2mc_qrn, mo2mc_qsn)
+!$acc loop collapse(3)        
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              totc(j,i,k) = mo2mc%qcn(j,i,k) + mo2mc%qin(j,i,k) + &
-                            mo2mc%qrn(j,i,k) + mo2mc%qsn(j,i,k)
+              totc(j,i,k) = mo2mc_qcn(j,i,k) + mo2mc_qin(j,i,k) + &
+                            mo2mc_qrn(j,i,k) + mo2mc_qsn(j,i,k)
             end do
           end do
         end do
+!$acc end parallel
       else
+!$acc parallel present(totc, mo2mc_qcn, mo2mc_qin)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
-              totc(j,i,k) = (mo2mc%qcn(j,i,k) + alphaice*mo2mc%qin(j,i,k))
+              totc(j,i,k) = (mo2mc_qcn(j,i,k) + alphaice*mo2mc_qin(j,i,k))
             end do
           end do
         end do
+!$acc end parallel
       end if
     else
+!$acc parallel present(totc, mo2mc_qcn)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
-            totc(j,i,k) = mo2mc%qcn(j,i,k)
+            totc(j,i,k) = mo2mc_qcn(j,i,k)
           end do
         end do
       end do
+!$acc end parallel
     end if
 
     select case ( icldfrac )
       case (1)
-        call xuran_cldfrac(mo2mc%phs,totc,mo2mc%qvn, &
-                           mo2mc%qs,mo2mc%rh,mc2mo%fcc)
+        call xuran_cldfrac(mo2mc_phs,totc,mo2mc_qvn, &
+                           mo2mc_qs,mo2mc_rh,mc2mo_fcc)
       case (2)
-        call thomp_cldfrac(mo2mc%phs,mo2mc%t,mo2mc%rho,mo2mc%qvn, &
-                           totc,mo2mc%qsn,mo2mc%qin,mo2mc%ldmsk,  &
-                           ds,mc2mo%fcc)
+        call thomp_cldfrac(mo2mc_phs,mo2mc_t,mo2mc_rho,mo2mc_qvn, &
+                           totc,mo2mc_qsn,mo2mc_qin,mo2mc_ldmsk,  &
+                           ds,mc2mo_fcc)
       case (3)
-        call gulisa_cldfrac(totc,mo2mc%z,mc2mo%fcc)
+        call gulisa_cldfrac(totc,mo2mc_z,mc2mo_fcc)
       case (4)
-        call texeira_cldfrac(totc,mo2mc%qs,mo2mc%rh,rh0,mc2mo%fcc)
+        call texeira_cldfrac(totc,mo2mc_qs,mo2mc_rh,rh0,mc2mo_fcc)
       case (5)
-        call tompkins_cldfrac(totc,mo2mc%rh,mo2mc%phs,mo2mc%ps2,mc2mo%fcc)
+        call tompkins_cldfrac(totc,mo2mc_rh,mo2mc_phs,mo2mc_ps2,mc2mo_fcc)
       case (6)
-        call echam5_cldfrac(totc,mo2mc%rh,mo2mc%phs,mo2mc%ps2,mc2mo%fcc)
+        call echam5_cldfrac(totc,mo2mc_rh,mo2mc_phs,mo2mc_ps2,mc2mo_fcc)
       case default
-        call subex_cldfrac(mo2mc%t,mo2mc%phs,mo2mc%qvn, &
-                           totc,mo2mc%rh,tc0,rh0,mc2mo%fcc)
+        call subex_cldfrac(mo2mc_t,mo2mc_phs,mo2mc_qvn, &
+                           totc,mo2mc_rh,tc0,rh0,mc2mo_fcc)
     end select
 
     !------------------------------------------
@@ -277,31 +345,37 @@ module mod_micro_interface
     !------------------------------------------
 
     if ( icldmstrat == 1 ) then
+!$acc parallel present(mo2mc_iveg, mo2mc_phs, mc2mo_fcc, atms_th700, atms_th3d)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
-            if ( mo2mc%iveg(j,i) == 15 ) then
-              if ( mo2mc%phs(j,i,k) >= 70000.0_rkx ) then
+            if ( mo2mc_iveg(j,i) == 15 ) then
+              if ( mo2mc_phs(j,i,k) >= 70000.0_rkx ) then
                 ! Klein, S. A., and D. L. Hartmann,
                 ! The seasonal cycle of low stratiform clouds,
                 ! J. Climate, 6, 1587-1606, 1993
-                mc2mo%fcc(j,i,k) = max(mc2mo%fcc(j,i,k), &
-                      min(((atms%th700(j,i)-atms%th3d(j,i,k)) * &
+                mc2mo_fcc(j,i,k) = max(mc2mo_fcc(j,i,k), &
+                      min(((atms_th700(j,i)-atms_th3d(j,i,k)) * &
                            0.057_rkx) - 0.5573_rkx,1.0_rkx))
               end if
             end if
           end do
         end do
       end do
+!$acc end parallel
     end if
 
+!$acc parallel present(mc2mo_fcc)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
-          mc2mo%fcc(j,i,k) = max(min(mc2mo%fcc(j,i,k),hicld),d_zero)
+          mc2mo_fcc(j,i,k) = max(min(mc2mo_fcc(j,i,k),hicld),d_zero)
         end do
       end do
     end do
+!$acc end parallel
 
     !-----------------------------------------------------------------
     ! 2.  Combine large-scale and convective fraction and liquid water
@@ -309,24 +383,26 @@ module mod_micro_interface
     !-----------------------------------------------------------------
 
     if ( iconvlwp == 1 ) then
+!$acc parallel present(mc2mo_fcc, mo2mc_t, cldfra, cldlwc) private(exlwc)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
             exlwc = d_zero
             ! Cloud Water Volume
-            if ( mc2mo%fcc(j,i,k) > lowcld ) then
+            if ( mc2mo_fcc(j,i,k) > lowcld ) then
               ! Apply the parameterisation based on temperature to the
               ! the large scale clouds.
-              exlwc = clwfromt(mo2mc%t(j,i,k))
+              exlwc = clwfromt(mo2mc_t(j,i,k))
             end if
             if ( cldfra(j,i,k) > lowcld ) then
               ! get maximum cloud fraction between cumulus and large scale
-              cldlwc(j,i,k) = (exlwc * mc2mo%fcc(j,i,k) + &
+              cldlwc(j,i,k) = (exlwc * mc2mo_fcc(j,i,k) + &
                               cldlwc(j,i,k) * cldfra(j,i,k)) / &
-                              (cldfra(j,i,k) + mc2mo%fcc(j,i,k))
-              cldfra(j,i,k) = max(cldfra(j,i,k),mc2mo%fcc(j,i,k))
+                              (cldfra(j,i,k) + mc2mo_fcc(j,i,k))
+              cldfra(j,i,k) = max(cldfra(j,i,k),mc2mo_fcc(j,i,k))
             else
-              cldfra(j,i,k) = mc2mo%fcc(j,i,k)
+              cldfra(j,i,k) = mc2mo_fcc(j,i,k)
               cldlwc(j,i,k) = exlwc
             end if
             if ( cldlwc(j,i,k) > d_zero ) then
@@ -337,32 +413,35 @@ module mod_micro_interface
           end do
         end do
       end do
+!$acc end parallel
     else
       if ( any(icup > 1) ) then
+!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldfra, cldwc) private(exlwc, ichi)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
               exlwc = d_zero
               ! Cloud Water Volume
               ! kg gq / kg dry air * kg dry air / m3 * 1000 = g qc / m3
-              if ( mc2mo%fcc(j,i,k) > lowcld ) then
-                exlwc = (totc(j,i,k)*d_1000)*mo2mc%rho(j,i,k)
+              if ( mc2mo_fcc(j,i,k) > lowcld ) then
+                exlwc = (totc(j,i,k)*d_1000)*mo2mc_rho(j,i,k)
                 ! NOTE : IN CLOUD HERE IS NEEDED !!!
-                exlwc = exlwc/mc2mo%fcc(j,i,k)
+                exlwc = exlwc/mc2mo_fcc(j,i,k)
               end if
               ! Scaling for CF
               ! Implements CF scaling as in Liang GRL 32, 2005
               ! doi: 10.1029/2004GL022301
-              ichi = int(mc2mo%fcc(j,i,k)*real(nchi-1,rkx))
+              ichi = int(mc2mo_fcc(j,i,k)*real(nchi-1,rkx))
               exlwc = exlwc * chis(ichi)
               if ( cldfra(j,i,k) > lowcld ) then
                 ! get maximum cloud fraction between cumulus and large scale
-                cldlwc(j,i,k) = (exlwc * mc2mo%fcc(j,i,k) + &
+                cldlwc(j,i,k) = (exlwc * mc2mo_fcc(j,i,k) + &
                                 cldlwc(j,i,k) * cldfra(j,i,k)) / &
-                                (cldfra(j,i,k) + mc2mo%fcc(j,i,k))
-                cldfra(j,i,k) = max(cldfra(j,i,k),mc2mo%fcc(j,i,k))
+                                (cldfra(j,i,k) + mc2mo_fcc(j,i,k))
+                cldfra(j,i,k) = max(cldfra(j,i,k),mc2mo_fcc(j,i,k))
               else
-                cldfra(j,i,k) = mc2mo%fcc(j,i,k)
+                cldfra(j,i,k) = mc2mo_fcc(j,i,k)
                 cldlwc(j,i,k) = exlwc
               end if
               if ( cldlwc(j,i,k) > d_zero ) then
@@ -373,38 +452,44 @@ module mod_micro_interface
             end do
           end do
         end do
+!$acc end parallel
       else
+!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldwc, cldfra) private(exlwc, ichi)
+!$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
             do j = jci1 , jci2
               exlwc = d_zero
               ! Cloud Water Volume
               ! kg gq / kg dry air * kg dry air / m3 * 1000 = g qc / m3
-              if ( mc2mo%fcc(j,i,k) > lowcld ) then
-                exlwc = (totc(j,i,k)*d_1000)*mo2mc%rho(j,i,k)
+              if ( mc2mo_fcc(j,i,k) > lowcld ) then
+                exlwc = (totc(j,i,k)*d_1000)*mo2mc_rho(j,i,k)
                 ! NOTE : IN CLOUD HERE IS NEEDED !!!
-                exlwc = exlwc/mc2mo%fcc(j,i,k)
+                exlwc = exlwc/mc2mo_fcc(j,i,k)
               end if
               ! Scaling for CF
               ! Implements CF scaling as in Liang GRL 32, 2005
               ! doi: 10.1029/2004GL022301
-              ichi = int(mc2mo%fcc(j,i,k)*real(nchi-1,rkx))
+              ichi = int(mc2mo_fcc(j,i,k)*real(nchi-1,rkx))
               exlwc = exlwc * chis(ichi)
               cldlwc(j,i,k) = exlwc
               if ( cldlwc(j,i,k) > d_zero ) then
-                cldfra(j,i,k) = min(max(mc2mo%fcc(j,i,k),d_zero),hicld)
+                cldfra(j,i,k) = min(max(mc2mo_fcc(j,i,k),d_zero),hicld)
               else
                 cldfra(j,i,k) = d_zero
               end if
             end do
           end do
         end do
+!$acc end parallel
       end if
     end if
 
     if ( ipptls == 1 ) then
-      rh0adj = d_one - (d_one-mo2mc%rh)/(d_one-cldfra)**2
+!$acc kernels present(rh0adj, mo2mc_rh, cldfra)
+      rh0adj = d_one - (d_one-mo2mc_rh)/(d_one-cldfra)**2
       rh0adj = max(0.0_rkx,min(rh0adj,0.99999_rkx))
+!$acc end kernels
     end if
 
     contains
@@ -453,13 +538,13 @@ module mod_micro_interface
             qvcs = max(mo_atm%qx(j,i,k,iqv) + dt*mo_atm%qxten(j,i,k,iqv),minqq)
             qccs = max(mo_atm%qx(j,i,k,iqc) + dt*mo_atm%qxten(j,i,k,iqc),d_zero)
             pres = mo_atm%p(j,i,k)
-            qvc_cld = max((mo2mc%qs(j,i,k) + &
+            qvc_cld = max((mo2mc_qs(j,i,k) + &
                        dt * mc2mo%qxten(j,i,k,iqv)),minqq)
           else
             tmp3 = (atm2%t(j,i,k)+dt*aten%t(j,i,k,pc_total))/sfs%psc(j,i)
             qvcs = atm2%qx(j,i,k,iqv) + dt*aten%qx(j,i,k,iqv,pc_total)
             qccs = atm2%qx(j,i,k,iqc) + dt*aten%qx(j,i,k,iqc,pc_total)
-            qvc_cld = max((mo2mc%qs(j,i,k) + &
+            qvc_cld = max((mo2mc_qs(j,i,k) + &
                        dt * mc2mo%qxten(j,i,k,iqv)/sfs%psc(j,i)),minqq)
             if ( idynamic == 1 ) then
               pres = (hsigma(k)*sfs%psc(j,i)+ptop)*d_1000

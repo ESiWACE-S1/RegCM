@@ -56,6 +56,8 @@ module mod_cloud_echam5
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(qc, rh, p, ps, fcc) private(rhrng, sig, rhcrit)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -79,6 +81,7 @@ module mod_cloud_echam5
         end do
       end do
     end do
+!$acc end parallel
 
   end subroutine echam5_cldfrac
 

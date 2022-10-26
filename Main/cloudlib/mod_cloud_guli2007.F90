@@ -53,6 +53,8 @@ module mod_cloud_guli2007
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(qt, z, fcc) private(stddev, qgkg)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -71,6 +73,7 @@ module mod_cloud_guli2007
         end do
       end do
     end do
+!$acc end parallel
 
   end subroutine gulisa_cldfrac
 

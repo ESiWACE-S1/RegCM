@@ -51,6 +51,8 @@ module mod_cloud_xuran
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(p, qc, qv, qs, rh, fcc) private(qcld, rhrng, botm, rm)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -70,6 +72,7 @@ module mod_cloud_xuran
         end do
       end do
     end do
+!$acc end parallel
 
   end subroutine xuran_cldfrac
 

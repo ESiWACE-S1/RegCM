@@ -1776,8 +1776,10 @@ module mod_moloch
           tketen = d_zero
         end if
 
+!$acc kernels present(cldfra, cldlwc)
         cldfra(:,:,:) = d_zero
         cldlwc(:,:,:) = d_zero
+!$acc end kernels
 
         if ( idiag > 0 ) then
           ten0 = t(jci1:jci2,ici1:ici2,:)

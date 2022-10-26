@@ -51,6 +51,8 @@ module mod_cloud_tompkins
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(qc, rh, p, ps, fcc) private(rhrng, sig, kappa, rhcrit)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -73,6 +75,7 @@ module mod_cloud_tompkins
         end do
       end do
     end do
+!$acc end parallel
 
   end subroutine tompkins_cldfrac
 

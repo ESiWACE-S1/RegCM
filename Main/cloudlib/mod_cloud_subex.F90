@@ -57,6 +57,8 @@ module mod_cloud_subex
     ! 1.  Determine large-scale cloud fraction
     !-----------------------------------------
 
+!$acc parallel present(t, p, qv, qc, rh, tc0, rh0, fcc) private(rhrng, rh0adj)
+!$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -83,6 +85,7 @@ module mod_cloud_subex
         end do
       end do
     end do
+!$acc end parallel
     !
     ! Correction:
     !   Ivan Guettler, 14.10.2010.
@@ -91,6 +94,8 @@ module mod_cloud_subex
     ! in the CCSM3 Climate Model, J. Climate
     !
     if ( larcticcorr ) then
+!$acc parallel present(t, p, qv, qc, rh, tc0, rh0, fcc)
+!$acc loop collapse(3)
       do k = 1 , kz
         do i = ici1 , ici2
           do j = jci1 , jci2
@@ -103,6 +108,7 @@ module mod_cloud_subex
           end do
         end do
       end do
+!$acc end parallel
     end if
 
   end subroutine subex_cldfrac

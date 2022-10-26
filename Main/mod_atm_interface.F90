@@ -1107,6 +1107,7 @@ module mod_atm_interface
       call getmem3d(cldfra,jci1,jci2,ici1,ici2,1,kz,'storage:cldfra')
 !$acc enter data create(cldfra)
       call getmem3d(cldlwc,jci1,jci2,ici1,ici2,1,kz,'storage:cldlwc')
+!$acc enter data create(cldlwc)
       call getmem3d(heatrt,jci1,jci2,ici1,ici2,1,kz,'storage:heatrt')
 !$acc enter data create(heatrt)
       call getmem2d(totcf,jci1,jci2,ici1,ici2,'storage:totcf')
@@ -1146,7 +1147,7 @@ module mod_atm_interface
       end if
       call getmem2d(crrate,jci1,jci2,ici1,ici2,'storage:crrate')
       call getmem2d(ncrrate,jci1,jci2,ici1,ici2,'storage:ncrrate')
-!$acc update device(cldfra, heatrt)
+!$acc update device(cldfra, heatrt, cldlwc)
     end subroutine allocate_mod_atm_interface
 
     subroutine export_data_from_atm(expfie)
