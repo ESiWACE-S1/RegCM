@@ -68,7 +68,7 @@ module mod_cloud_thomp
     rh_00l = 0.839_rkx + sqrt(d_one/(50.0_rkx+gridkm*gridkm*gridkm*0.5_rkx))
     rh_00o = 0.879_rkx + sqrt(d_one/(100.0_rkx+gridkm*gridkm))
 
-!$acc parallel present(p, t, rho, qv, qc, qs, qi, iland, gridkm, cldfra) private(rhi_max, qvsat, tk, tc, qvsw, qvsi, rhum, rh_00, qvs1d, cfr1d, t1d, p1d, r1d, qc1d, qi1d, qs1d)
+!$acc parallel present(p, t, qv, qc, qi, iland, cldfra) private(rhi_max, qvsat, tk, tc, qvsw, qvsi, rhum, rh_00)
 !$acc loop collapse(3)
     do k = 1 , kz
       do i = ici1 , ici2
@@ -111,10 +111,11 @@ module mod_cloud_thomp
         end do
       end do
     end do
+!$acc end parallel
 
     ! Prepare for a 1-d column to find various cloud layers.
 
-!$acc loop collapse(2)
+!$acc parallel present(p, t, rho, qc, qs, qi, cldfra) private(qvsat, qvs1d, cfr1d, t1d, p1d, r1d, qc1d, qi1d, qs1d)
     do i = ici1 , ici2
       do j = jci1 , jci2
         do k = 1 , kz
