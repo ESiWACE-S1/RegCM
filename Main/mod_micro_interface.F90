@@ -207,7 +207,7 @@ module mod_micro_interface
 !$acc enter data create(mo2mc_qsn)
       call assignpnt(atms%qxb3d,mo2mc%qrn,iqr)
       call assignpnt(mo2mc%qrn,mo2mc_qrn)
-!$acc enter data create(mo2cm_qrn)
+!$acc enter data create(mo2mc_qrn)
     end if
 
     if ( ichem == 1 ) then
@@ -249,7 +249,7 @@ module mod_micro_interface
       case default
         return
     end select
-!$acc update device(mo2mc_qcn, mo2mc_qin, mo2cm_qrn, mo2cm_qsn, mo2mc_phs, mo2mc_qvn, mo2mc_qs, mo2mc_rh, mc2mo_fcc, mo2mc_t, mo2mc_rho, mo2mc_ldmsk, mo2mc_z, mo2mc_ps2, mo2mc_iveg, atms_th700, atms_th3d)
+!$acc update device(mo2mc_qcn, mo2mc_qin, mo2mc_qrn, mo2mc_qsn, mo2mc_phs, mo2mc_qvn, mo2mc_qs, mo2mc_rh, mc2mo_fcc, mo2mc_t, mo2mc_rho, mo2mc_ldmsk, mo2mc_z, mo2mc_ps2, mo2mc_iveg, atms_th700, atms_th3d)
   end subroutine init_micro
 
   subroutine microscheme
@@ -454,7 +454,7 @@ module mod_micro_interface
         end do
 !$acc end parallel
       else
-!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldwc, cldfra) private(exlwc, ichi)
+!$acc parallel present(mc2mo_fcc, totc, mo2mc_rho, chis, cldlwc, cldfra) private(exlwc, ichi)
 !$acc loop collapse(3)
         do k = 1 , kz
           do i = ici1 , ici2
