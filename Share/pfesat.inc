@@ -51,6 +51,7 @@
 
 !DIR$ ATTRIBUTES FORCEINLINE :: pfesat_water
   pure elemental real(rkx) function pfesat_water(t) result(es)
+!$acc routine seq
     implicit none
     real(rkx) , intent(in) :: t     ! Temperature (K)
 
@@ -76,6 +77,7 @@
 
 !DIR$ ATTRIBUTES FORCEINLINE :: pfesat_ice
   pure elemental real(rkx) function pfesat_ice(t) result(es)
+!$acc routine seq
     implicit none
     real(rkx) , intent(in) :: t     ! Temperature (K)
 
