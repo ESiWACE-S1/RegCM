@@ -58,7 +58,7 @@ module mod_che_cumtran
     dotran(:,:) = .false.
 !$acc end kernels
     ! Emanuel anf Tiedtke do their transport internally
-!$acc parallel present(dotran)
+!$acc parallel present(dotran, cveg2d)
 !$acc loop collapse(2)
     do i = ici1 , ici2
       do j = jci1 , jci2

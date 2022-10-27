@@ -126,6 +126,7 @@ module mod_che_interface
 
     call assignpnt(mddom%ht,cht)
     call assignpnt(mddom%iveg,cveg2d)
+!$acc data enter create(cveg2d)
     call assignpnt(sfs%psb,cpsb)
     call assignpnt(xpsb%b0,psbb0)
     call assignpnt(xpsb%b1,psbb1)
@@ -186,6 +187,8 @@ module mod_che_interface
     call assignpnt(sw_vol,csw_vol)
     call assignpnt(tsoi,ctsoi)
 #endif
+
+!$acc update device(cveg2d)
 
     call init_cumtran
 
