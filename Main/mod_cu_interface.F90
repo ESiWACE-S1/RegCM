@@ -129,7 +129,7 @@ module mod_cu_interface
     implicit none
     integer(ik4) :: i , j
     call getmem2d(cuscheme,jci1,jci2,ici1,ici2,'cumulus:cuscheme')
-  !$acc enter data create(cuscheme)
+!$acc enter data create(cuscheme)
     do i = ici1 , ici2
       do j = jci1 , jci2
         if ( isocean(mddom%lndcat(j,i)) ) then
@@ -511,7 +511,7 @@ module mod_cu_interface
         end if
 
         if ( ipptls == 2 ) then
-!$acc parallel present(cu_qten)
+!$acc parallel present(cu_qten, cuscheme)
 !$acc loop collapse(3)
           do k = 1 , kz
             do i = ici1 , ici2
