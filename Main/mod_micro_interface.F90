@@ -136,7 +136,7 @@ module mod_micro_interface
     call getmem3d(totc,jci1,jci2,ici1,ici2,1,kz,'subex:totc')
 !$acc enter data create(totc)
 !$acc enter data create(chis)
-!$acc parallel present(chis)
+!$acc parallel present(chis) private(cf)
 !$acc loop
     do i = 1 , nchi
       cf = real(i-1,rkx)/real(nchi-1,rkx)
