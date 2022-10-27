@@ -126,7 +126,7 @@ module mod_che_interface
 
     call assignpnt(mddom%ht,cht)
     call assignpnt(mddom%iveg,cveg2d)
-!$acc data enter create(cveg2d)
+!$acc enter data create(cveg2d)
     call assignpnt(sfs%psb,cpsb)
     call assignpnt(xpsb%b0,psbb0)
     call assignpnt(xpsb%b1,psbb1)
