@@ -48,7 +48,7 @@ module mod_dynparam
   ! Point in vertical
 
   integer(ik4) , public :: kz
-!$acc enter data create(kz)
+!$acc declare create(kz)
 
   ! If not 14 , 18 or 23 (precalculated), hint for custom calculation
 
