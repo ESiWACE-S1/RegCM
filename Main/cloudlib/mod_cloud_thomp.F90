@@ -115,7 +115,7 @@ module mod_cloud_thomp
 
     ! Prepare for a 1-d column to find various cloud layers.
 
-!$acc parallel present(p, t, rho, qc, qs, qi, cldfra) private(qvsat, qvs1d, cfr1d, t1d, p1d, r1d, qc1d, qi1d, qs1d)
+!$acc parallel present(p, t, rho, qc, qs, qi, cldfra) private(qvsat, qvs1d, cfr1d, t1d, p1d, r1d, qc1d, qi1d, qs1d, kk)
     do i = ici1 , ici2
       do j = jci1 , jci2
         do k = 1 , kz
@@ -146,6 +146,7 @@ module mod_cloud_thomp
      ! a function of temperature and pressure
      !
      pure real(rkx) function rslf(p,t)
+!$acc routine seq
        implicit none
        real(rkx) , intent(in) :: p , t
        real(rkx) :: esl , x
@@ -167,6 +168,7 @@ module mod_cloud_thomp
      ! function of temperature and pressure
      !
      pure real(rkx) function rsif(p,t)
+!$acc routine seq
        implicit none
        real(rkx) , intent(in) :: p , t
        real(rkx) :: esi , x
