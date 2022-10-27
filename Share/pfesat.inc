@@ -5,6 +5,7 @@
   !
 !DIR$ ATTRIBUTES FORCEINLINE :: pfesat
   pure elemental real(rkx) function pfesat(t) result(es)
+!$acc routine seq
     implicit none
     real(rkx) , intent(in) :: t     ! Temperature (K)
 
