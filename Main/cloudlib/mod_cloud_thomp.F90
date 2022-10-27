@@ -193,6 +193,7 @@ module mod_cloud_thomp
   ! unless existing lwc/iwc is already there.
   !
   subroutine find_cloudlayers(qvs1d,cfr1d,t1d,p1d,r1d,qc1d,qi1d,qs1d)
+!$acc routine seq
     implicit none
     real(rkx) , dimension(kz) , intent(in) :: qvs1d , t1d , p1d , r1d
     real(rkx) , dimension(kz) , intent(inout) :: cfr1d
@@ -328,6 +329,7 @@ module mod_cloud_thomp
   end subroutine find_cloudlayers
 
   subroutine adjust_cloudice(cfr,qi,qs,qvs,t,rho,dz,k1,k2)
+!$acc routine seq
     implicit none
     integer(ik4) , intent(in):: k1 , k2
     real(rkx) , dimension(kz) , intent(in):: cfr , qvs , t , rho , dz
@@ -355,6 +357,7 @@ module mod_cloud_thomp
   end subroutine adjust_cloudice
 
   subroutine adjust_cloudh2o(cfr,qc,qvs,t,rho,dz,k1,k2)
+!$acc routine seq
     implicit none
     integer(ik4) , intent(in):: k1 , k2
     real(rkx) , dimension(kz) :: cfr , qc , qvs , t , rho , dz
@@ -392,6 +395,7 @@ module mod_cloud_thomp
   ! the supposed amounts due to the cloud fraction scheme.
   !
   subroutine adjust_cloudfinal(cfr,qc,qi,rho,dz,k_tropo)
+!$acc routine seq
     implicit none
     integer(ik4) , intent(in) :: k_tropo
     real(rkx) , dimension(kz) , intent(in) :: cfr , rho , dz
