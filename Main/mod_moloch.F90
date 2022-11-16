@@ -796,8 +796,9 @@ module mod_moloch
         integer(ik4) :: j , i , k
 
 !$acc parallel present(p2d, p)
-!$acc loop collapse(3)
+!$acc loop gang
         do k = 1 , kz
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p2d(j,i) = 0.125_rkx * (p(j-1,i,k) + p(j+1,i,k) + &
@@ -806,8 +807,7 @@ module mod_moloch
             end do
           end do
         end do
-!$acc loop collapse(3)
-        do k = 1 , kz
+!$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
               p(j,i,k) = p(j,i,k) + nu * p2d(j,i)
