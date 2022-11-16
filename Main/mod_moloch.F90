@@ -806,7 +806,6 @@ module mod_moloch
                          d_half   * p(j,i,k)
             end do
           end do
-        end do
 !$acc loop vector collapse(2)
           do i = ici1 , ici2
             do j = jci1 , jci2
