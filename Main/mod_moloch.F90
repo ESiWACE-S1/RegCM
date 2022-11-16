@@ -1343,8 +1343,13 @@ module mod_moloch
 
 !$acc parallel present(wfw, pp, s, fmzf, fmz, wz) private(zamu, is, k1, k1p1, r, b, zphi, wfwkp1, wfwk, zrfmu, zrfmd, zdv)
 !$acc loop collapse(3)
+#ifdef OPENACC
         do k = 1 , kz
           do i = ici1 , ici2
+#else
+        do i = ici1 , ici2
+          do k = 1 , kzm1
+#endif
             do j = jci1 , jci2
               if(k < kz) then
                 zamu = s(j,i,k+1) * zdtrdz
@@ -1362,12 +1367,17 @@ module mod_moloch
                 r = rdeno(pp(j,i,k1),pp(j,i,k1p1),pp(j,i,k),pp(j,i,k+1))
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu * b - is * b
+#ifdef OPENACC
                 wfwkp1 = d_half * s(j,i,k+1) * ((d_one+zphi)*pp(j,i,k+1) + &
                                                     (d_one-zphi)*pp(j,i,k))
               else
                 wfwkp1 = d_zero
+#else
+                wfw(j,k+1) = d_half * s(j,i,k+1) * ((d_one+zphi)*pp(j,i,k+1) + &
+                  (d_one-zphi)*pp(j,i,k))
+#endif
               end if
-
+#ifdef OPENACC
               if(k > 1) then
                 zamum1 = s(j,i,k) * zdtrdz
                 if ( zamum1 >= d_zero ) then
@@ -1394,16 +1404,32 @@ module mod_moloch
               zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
               zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * pp(j,i,k)
               wz(j,i,k) = pp(j,i,k) - wfwk * zrfmu + wfwkp1 * zrfmd + zdv
+#endif
             end do
           end do
+#ifndef OPENACC
+          do k = 1 , kz
+            do j = jci1 , jci2
+              zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
+              zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
+              zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * pp(j,i,k)
+              wz(j,i,k) = pp(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
+            end do
+          end do
+#endif
         end do
 !$acc end parallel
 
         if ( do_vadvtwice ) then
 !$acc parallel present(wz, wwkw, s) private(zamu, is, k1, k1p1, r, b, zphi)
 !$acc loop collapse(3)
+#ifdef OPENACC
           do k = 1 , kz
             do i = ici1 , ici2
+#else
+          do i = ici1 , ici2
+            do k = 2 , kz
+#endif
               do j = jci1 , jci2
                 if(k == 1) then
                   wwkw(j,i,k) = d_zero
@@ -1423,11 +1449,31 @@ module mod_moloch
                   r = rdeno(wz(j,i,k1),wz(j,i,k1p1),wz(j,i,k-1),wz(j,i,k))
                   b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                   zphi = is + zamu * b - is * b
+#ifdef OPENACC
                   wwkw(j,i,k) = d_half*s(j,i,k) * ((d_one+zphi)*wz(j,i,k) + &
                                                     (d_one-zphi)*wz(j,i,k-1))
+#else
+                  wfw(j,k) = d_half*s(j,i,k) * ((d_one+zphi)*wz(j,i,k) + &
+                                                    (d_one-zphi)*wz(j,i,k-1))
+#endif
                 end if
               end do
             end do
+#ifndef OPENACC
+            do j = jci1 , jci2
+              zrfmd = zdtrdz * fmz(j,i,1)/fmzf(j,i,2)
+              zdv = -s(j,i,2) * zrfmd * wz(j,i,1)
+              wz(j,i,1) = wz(j,i,1) + wfw(j,2) * zrfmd + zdv
+            end do
+            do k = 2 , kz
+              do j = jci1 , jci2
+                zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
+                zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
+                zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * wz(j,i,k)
+                wz(j,i,k) = wz(j,i,k) - wfw(j,k)*zrfmu + wfw(j,k+1)*zrfmd + zdv
+              end do
+            end do
+#endif
           end do
 !$acc end parallel
 !$acc parallel present(fmzf, wz, wwkw, s, fmz) private(zrfmd, zrfmu, zdv)
