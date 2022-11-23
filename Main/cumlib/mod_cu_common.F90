@@ -144,6 +144,8 @@ module mod_cu_common
     integer(ik4):: i , j , k , ktop , kbot , kclth , ikh
     scalef = (d_one-clfrcv)
     if ( icumcloud <= 1 ) then
+!$acc parallel present(m2c, cu_cldfrac) private(ktop, kbot, kclth, akclth)
+!$acc loop collapse(2)
       do i = ici1 , ici2
         do j = jci1 , jci2
           ! The regcm model is top to bottom
@@ -157,12 +159,15 @@ module mod_cu_common
           end do
         end do
       end do
+!$acc parallel end
     else if ( icumcloud == 2 ) then
       if ( addnoise ) then
         ! Put 25% noise level. Update cld_profile each time.
         call random_number(rnum)
         cld_profile = (0.75_rkx+(rnum/2.0_rkx))*fixed_cld_profile
       end if
+!$acc parallel present(m2c, cu_cldfrac) private(ktop, kbot, kclth, scalep, ikh)
+!$acc loop collapse(2)
       do i = ici1 , ici2
         do j = jci1 , jci2
           ktop = cu_ktop(j,i)
@@ -177,6 +182,7 @@ module mod_cu_common
           end do
         end do
       end do
+!$acc end parallel
     end if
 
   end subroutine model_cumulus_cloud
