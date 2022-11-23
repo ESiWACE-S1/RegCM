@@ -159,7 +159,7 @@ module mod_cu_common
           end do
         end do
       end do
-!$acc parallel end
+!$acc end parallel
     else if ( icumcloud == 2 ) then
       if ( addnoise ) then
         ! Put 25% noise level. Update cld_profile each time.
