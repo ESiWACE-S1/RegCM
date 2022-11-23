@@ -142,9 +142,13 @@ module mod_cu_common
     type(mod_2_cum) , intent(in) :: m2c
     real(rkx) :: akclth , scalep , scalef
     integer(ik4):: i , j , k , ktop , kbot , kclth , ikh
+    real(rkx) , pointer , dimension(:,:,:) :: m2c_pas
+    assignpnt(m2c%pas, m2c_pas)
+!$acc enter data create(m2c_pas)
+!$acc update device(m2c_pas)
     scalef = (d_one-clfrcv)
     if ( icumcloud <= 1 ) then
-!$acc parallel present(m2c, cu_cldfrc) private(ktop, kbot, kclth, akclth)
+!$acc parallel present(cu_cldfrc) private(ktop, kbot, kclth, akclth)
 !$acc loop collapse(2)
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -166,7 +170,7 @@ module mod_cu_common
         call random_number(rnum)
         cld_profile = (0.75_rkx+(rnum/2.0_rkx))*fixed_cld_profile
       end if
-!$acc parallel present(m2c, cu_cldfrc) private(ktop, kbot, kclth, scalep, ikh)
+!$acc parallel present(m2c_pas, cu_cldfrc) private(ktop, kbot, kclth, scalep, ikh)
 !$acc loop collapse(2)
       do i = ici1 , ici2
         do j = jci1 , jci2
@@ -174,7 +178,7 @@ module mod_cu_common
           kbot = cu_kbot(j,i)
           kclth = kbot - ktop + 1
           if ( kclth < 2 ) cycle
-          scalep = min((m2c%pas(j,i,kbot)-m2c%pas(j,i,ktop)) / &
+          scalep = min((m2c_pas(j,i,kbot)-m2c_pas(j,i,ktop)) / &
                   maxcloud_dp,d_one)
           do k = ktop , kbot
             ikh = max(1,min(10,int((real(k-ktop+1,rkx)/real(kclth,rkx))*d_10)))

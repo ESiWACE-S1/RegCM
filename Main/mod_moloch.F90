@@ -321,7 +321,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, chiten, tdiag_con, qdiag_con, tdiag_lsc, qdiag_lsc, tdiag_tbl, qdiag_tbl)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, chiten, tdiag_con, qdiag_con, tdiag_lsc, qdiag_lsc, tdiag_tbl, qdiag_tbl, qx)
   end subroutine init_moloch
 
   !
