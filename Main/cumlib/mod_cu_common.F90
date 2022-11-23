@@ -143,7 +143,7 @@ module mod_cu_common
     real(rkx) :: akclth , scalep , scalef
     integer(ik4):: i , j , k , ktop , kbot , kclth , ikh
     real(rkx) , pointer , dimension(:,:,:) :: m2c_pas
-    assignpnt(m2c%pas, m2c_pas)
+    call assignpnt(m2c%pas, m2c_pas)
 !$acc enter data create(m2c_pas)
 !$acc update device(m2c_pas)
     scalef = (d_one-clfrcv)
