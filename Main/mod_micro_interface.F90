@@ -133,6 +133,8 @@ module mod_micro_interface
       call allocate_mod_wsm5
     end if
     call getmem2d(rh0,jci1,jci2,ici1,ici2,'subex:rh0')
+!$acc enter data create(rh0)
+!$acc update device(rh0) async(2)
     call getmem3d(totc,jci1,jci2,ici1,ici2,1,kz,'subex:totc')
 !$acc enter data create(totc)
 !$acc enter data create(chis)

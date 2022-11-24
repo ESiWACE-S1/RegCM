@@ -276,7 +276,7 @@ module mod_moloch
     call assignpnt(mo_atm%rho,rho)
 !$acc enter data create(rho)
     call assignpnt(mo_atm%qx,qx)
-!$acc enter data create(qx)
+!$acc enter data create(qx(jce2ga,ice2ga,kz,nqx))
     call assignpnt(mo_atm%qs,qsat)
 !$acc enter data create(qsat)
     call assignpnt(mo_atm%qx,qv,iqv)
@@ -321,7 +321,7 @@ module mod_moloch
     lrotllr = (iproj == 'ROTLLR')
     ddamp = 0.2_rkx
 ! Update static arrays on device
-!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, chiten, tdiag_con, qdiag_con, tdiag_lsc, qdiag_lsc, tdiag_tbl, qdiag_tbl, qx)
+!$acc update device(mu, mv, rmu, rmv, mx, mx2, fmz, fmzf, hx, hy, gzitak, gzitakh, wwkw, w, coru, corv, chiten, tdiag_con, qdiag_con, tdiag_lsc, qdiag_lsc, tdiag_tbl, qdiag_tbl)
   end subroutine init_moloch
 
   !
