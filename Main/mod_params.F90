@@ -346,7 +346,7 @@ module mod_params
     rh0oce    = 0.90_rkx   ! Relative humidity threshold for ocean
     tc0       = 238.0_rkx  ! Below this temp, rh0 begins to approach unity
 !$acc enter data create(tc0)
-!$acc update device(tc0) async(2)
+!$acc update device(tc0)
     cllwcv    = 0.3e-3_rkx ! Cloud liquid water content for convective precip.
     clfrcvmax = 0.75_rkx   ! Max cloud fractional cover for convective precip.
     cftotmax  = 0.75_rkx   ! Max total cover cloud fraction for radiation

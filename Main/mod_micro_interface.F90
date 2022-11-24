@@ -134,7 +134,7 @@ module mod_micro_interface
     end if
     call getmem2d(rh0,jci1,jci2,ici1,ici2,'subex:rh0')
 !$acc enter data create(rh0)
-!$acc update device(rh0) async(2)
+!$acc update device(rh0)
     call getmem3d(totc,jci1,jci2,ici1,ici2,1,kz,'subex:totc')
 !$acc enter data create(totc)
 !$acc enter data create(chis)
