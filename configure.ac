@@ -697,16 +697,16 @@ else
     NOOPTFC="-O1 $FCFLAGS"
     FCFLAGS="-O3 -fast -fastsse $FCFLAGS"
     if eval "test x"$USE_OPENACC" = x1"; then
-      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
-      NOOPTFC="$NOOPTFC -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=${PGI_GPU_ARCH},lineinfo -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc=gpu -gpu=${PGI_GPU_ARCH},lineinfo -Minfo=accel"
     fi
     if eval "test x"$USE_OPENACC" = x2"; then
-      FCFLAGS="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"
-      NOOPTFC="$NOOPTFC -acc=gpu -gpu="${PGI_GPU_ARCH}",autocompare -Minfo=accel"
+      FCFLAGS="$NOOPTFC -acc=gpu -gpu=${PGI_GPU_ARCH},autocompare -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc=gpu -gpu=${PGI_GPU_ARCH},autocompare -Minfo=accel"
     fi
     if eval "test x"$USE_OPENACC" = x3"; then
-      FCFLAGS="$FCFLAGS -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo,managed -Minfo=accel"
-      NOOPTFC="$NOOPTFC -acc=gpu -gpu=$PGI_GPU_ARCH,lineinfo,managed -Minfo=accel"
+      FCFLAGS="$FCFLAGS -acc=gpu -gpu=${PGI_GPU_ARCH},lineinfo,managed -Minfo=accel"
+      NOOPTFC="$NOOPTFC -acc=gpu -gpu=${PGI_GPU_ARCH},lineinfo,managed -Minfo=accel"
     fi
     AC_SUBST(FCFLAGS)
     AC_SUBST(NOOPTFC)
