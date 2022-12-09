@@ -1026,10 +1026,16 @@ module mod_moloch
           ! new w (implicit scheme) from Equation 19
 !$acc parallel present(deltaw, w, fmzf, tetav, qv, qsat, t, pai, zdiv2, fmz, ffilt, wwkw) private(zrom1w, zqs, zdth, zwexpl, zu, zd, zrapp)
 !$acc loop collapse(2)
+#ifdef OPENACC
           do i = ici1 , ici2
             do j = jci1 , jci2
 !$acc loop seq
               do k = kz , 2 , -1
+#else
+          do k = kz , 2 , -1
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+#endif
                   deltaw(j,i,k) = -w(j,i,k)
                 ! explicit w:
                 !    it must be consistent with the initialization of pai
@@ -1061,14 +1067,27 @@ module mod_moloch
                 w(j,i,k) = zrapp * (zwexpl + zd * w(j,i,k+1))
                 wwkw(j,i,k) = zrapp * zu
               end do
+#idef OPENACC
 !$acc loop seq
               do k = 2 , kz
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
                 deltaw(j,i,k) = deltaw(j,i,k) + w(j,i,k)
               end do
+#endif
             end do
           end do
 !$acc end parallel
+#ifndef OPENACC
+          ! 2nd loop for the tridiagonal inversion
+          do k = 2 , kz
+            do i = ici1 , ici2
+              do j = jci1 , jci2
+                w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
+                deltaw(j,i,k) = deltaw(j,i,k) + w(j,i,k)
+              end do
+            end do
+          end do
+#endif
 
           ! new Exner function (Equation 19)
 !$acc parallel present(zdiv2, fmz, w)
