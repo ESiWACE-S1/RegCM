@@ -1398,7 +1398,6 @@ module mod_moloch
               else
                 wfwk = d_zero
               end if
-
               zrfmu = zdtrdz * fmz(j,i,k)/fmzf(j,i,k)
               zrfmd = zdtrdz * fmz(j,i,k)/fmzf(j,i,k+1)
               zdv = (s(j,i,k)*zrfmu - s(j,i,k+1)*zrfmd) * pp(j,i,k)
@@ -1423,37 +1422,37 @@ module mod_moloch
 !$acc parallel present(wz, wwkw, s) private(zamu, is, k1, k1p1, r, b, zphi)
 !$acc loop collapse(3)
 #ifdef OPENACC
-          do k = 1 , kz
+          do k = 0 , kzm1
             do i = ici1 , ici2
 #else
           do i = ici1 , ici2
-            do k = 2 , kz
+            do k = 1 , kzm1
 #endif
               do j = jci1 , jci2
-                if(k == 1) then
-                  wwkw(j,i,k) = d_zero
+                if(k == 0) then
+                  wwkw(j,i,1) = d_zero
                 else
-                  zamu = s(j,i,k) * zdtrdz
+                  zamu = s(j,i,k+1) * zdtrdz
                   if ( zamu >= d_zero ) then
                     is = d_one
-                    k1 = k
+                    k1 = k + 1
                     k1p1 = k1 + 1
                     if ( k1p1 > kz ) k1p1 = kz
                   else
                     is = -d_one
-                    k1 = k - 2
-                    k1p1 = k - 1
+                    k1 = k - 1
+                    k1p1 = k
                     if ( k1 < 1 ) k1 = 1
                   end if
-                  r = rdeno(wz(j,i,k1),wz(j,i,k1p1),wz(j,i,k-1),wz(j,i,k))
+                  r = rdeno(wz(j,i,k1),wz(j,i,k1p1),wz(j,i,k),wz(j,i,k+1))
                   b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                   zphi = is + zamu * b - is * b
 #ifdef OPENACC
-                  wwkw(j,i,k) = d_half*s(j,i,k) * ((d_one+zphi)*wz(j,i,k) + &
-                                                    (d_one-zphi)*wz(j,i,k-1))
+                  wwkw(j,i,k+1) = d_half*s(j,i,k+1) * ((d_one+zphi)*wz(j,i,k+1) + &
+                                                    (d_one-zphi)*wz(j,i,k))
 #else
-                  wfw(j,k) = d_half*s(j,i,k) * ((d_one+zphi)*wz(j,i,k) + &
-                                                    (d_one-zphi)*wz(j,i,k-1))
+                  wfw(j,k+1) = d_half*s(j,i,k+1) * ((d_one+zphi)*wz(j,i,k+1) + &
+                                                    (d_one-zphi)*wz(j,i,k))
 #endif
                 end if
               end do
@@ -1474,6 +1473,7 @@ module mod_moloch
             end do
 #endif
           end do
+#ifdef OPENACC
 !$acc end parallel
 !$acc parallel present(fmzf, wz, wwkw, s, fmz) private(zrfmd, zrfmu, zdv)
 !$acc loop collapse(3)
@@ -1488,6 +1488,7 @@ module mod_moloch
             end do
           end do
 !$acc end parallel
+#endif
         end if
 
         if ( ma%has_bdybottom ) then
