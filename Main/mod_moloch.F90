@@ -1067,7 +1067,7 @@ module mod_moloch
                 w(j,i,k) = zrapp * (zwexpl + zd * w(j,i,k+1))
                 wwkw(j,i,k) = zrapp * zu
               end do
-#idef OPENACC
+#ifdef OPENACC
 !$acc loop seq
               do k = 2 , kz
                 w(j,i,k) = w(j,i,k) + wwkw(j,i,k)*w(j,i,k-1)
@@ -1539,11 +1539,14 @@ module mod_moloch
 
           ! Meridional advection
 
-!$acc parallel present(rmv, v, zpby, wz, mx, p0, pp, fmz) private(zamu, is, ih, ihm1, r, b, zphi, zhxvtn, zhxvts, zrfmn, zrfms, zdv)
-!$acc loop seq
+!$acc parallel present(rmv, v, fmz, wz, mx2, p0, pp) private(zamu, is, ih, ihm1, r, b, zphi, zpbys, zpbysp1, zrfmn, zrfms, zdv)
+!$acc loop collapse(3)
           do k = 1 , kz
-!$acc loop vector collapse(2)
+#ifdef OPENACC
+            do i = ici1 , ici2
+#else
             do i = ici1 , ice2ga
+#endif
               do j = jci1 , jci2
                 zamu = v(j,i,k) * zdtrdy
                 if ( zamu > d_zero ) then
@@ -1557,13 +1560,38 @@ module mod_moloch
                 r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i,k), wz(j,i-1,k))
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu*b - is*b
-                zpby(j,i) = d_half * v(j,i,k) * &
+#ifdef OPENACC
+                zpbys = d_half * v(j,i,k) * &
                   ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
-                !zpby(j,i) = d_half * zamu * &
-                !  ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+
+                zamu = v(j,i+1,k) * zdtrdy
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  ih = i
+                else
+                  is = -d_one
+                  ih = min(i+2,icross2)
+                end if
+                ihm1 = max(ih-1,icross1)
+                r = rdeno(wz(j,ih,k), wz(j,ihm1,k), wz(j,i+1,k), wz(j,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbysp1 = d_half * v(j,i+1,k) * &
+                  ((d_one+zphi)*wz(j,i,k) + (d_one-zphi)*wz(j,i+1,k))
+                zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
+                zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
+                zrfmn = zhxvtn * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
+                zrfms = zhxvts * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
+                zdv = (v(j,i+1,k) * zrfmn - v(j,i,k) * zrfms) * pp(j,i,k)
+                p0(j,i,k) = wz(j,i,k) + zpbys*zrfms - zpbysp1*zrfmn + zdv
+#else
+                zpby(j,i) = d_half * v(j,i,k) * &
+                      ((d_one+zphi)*wz(j,i-1,k) + (d_one-zphi)*wz(j,i,k))
+#endif
+    
               end do
             end do
-!$acc loop vector collapse(2)
+#ifndef OPENACC
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
@@ -1571,18 +1599,10 @@ module mod_moloch
                 zrfmn = zhxvtn * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i+1,k))
                 zrfms = zhxvts * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j,i-1,k))
                 zdv = (v(j,i+1,k) * zrfmn - v(j,i,k) * zrfms) * pp(j,i,k)
-                p0(j,i,k) = wz(j,i,k) + &
-                      zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv
+                p0(j,i,k) = wz(j,i,k) + zpby(j,i)*zrfms - zpby(j,i+1)*zrfmn + zdv
               end do
             end do
-            !do i = ici1 , ici2
-            !  do j = jci1 , jci2
-            !    zhxvtn = zdtrdy * rmv(j,i+1) * mx(j,i)
-            !    zhxvts = zdtrdy * rmv(j,i) * mx(j,i)
-            !    zdv = (v(j,i+1,k) * zhxvtn - v(j,i,k) * zhxvts) * pp(j,i,k)
-            !    p0(j,i,k) = wz(j,i,k) + zpby(j,i) - zpby(j,i+1) + zdv
-            !  end do
-            !end do
+#endif
           end do
 !$acc end parallel
 
@@ -1614,12 +1634,15 @@ module mod_moloch
 
           ! Zonal advection
 
-!$acc parallel present(fmz, pp, mu, zpbw, u, p0, pp) private(zamu, is, jh, jhm1, r, b, zphi, zcostx, zrfme, zrfmw, zdv)
-!$acc loop seq
+!$acc parallel present(rmu, pp, mx2, u, p0, fmz) private(zamu, is, jh, jhm1, r, b, zphi, zpbws, zpbwsp1, zrfme, zrfmw, zdv)
+!$acc loop collapse(3)
           do k = 1 , kz
-!$acc loop vector collapse(2)
             do i = ici1 , ici2
+#ifdef OPENACC
+              do j = jci1 , jci2
+#else
               do j = jci1 , jce2ga
+#endif
                 zamu = u(j,i,k) * mu(j,i) * zdtrdx
                 if ( zamu > d_zero ) then
                   is = d_one
@@ -1632,13 +1655,36 @@ module mod_moloch
                 r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j,i,k), p0(j-1,i,k))
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu*b - is*b
-                zpbw(j,i) = d_half * u(j,i,k) * &
-                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
-                !zpbw(j,i) = d_half * zamu * &
-                !     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+#ifdef OPENACC
+                zpbws = d_half * u(j,i,k) * mu(j,i) * &
+                ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+
+                zamu = u(j+1,i,k) * rmu(j+1,i) * zdtrdx
+                if ( zamu > d_zero ) then
+                  is = d_one
+                  jh = j
+                else
+                  is = -d_one
+                  jh = min(j+2,jcross2)
+                end if
+                jhm1 = max(jh-1,jcross1)
+                r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j+1,i,k), p0(j,i,k))
+                b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
+                zphi = is + zamu*b - is*b
+                zpbwsp1 = d_half * u(j+1,i,k) * rmu(j+1,i) * &
+                    ((d_one+zphi)*p0(j,i,k) + (d_one-zphi)*p0(j+1,i,k))
+                zcostx = zdtrdx * mu(j,i)
+                zrfme = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
+                zrfmw = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j-1,i,k))
+                zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
+                pp(j,i,k) = p0(j,i,k) + zpbws*zrfmw - zpbwsp1*zrfme + zdv
+#else
+                zpbw(j,i) = d_half * u(j,i,k) * rmu(j,i) * &
+                    ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
+#endif
               end do
             end do
-!$acc loop vector collapse(2)
+#ifndef OPENACC
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zcostx = zdtrdx * mu(j,i)
@@ -1649,14 +1695,7 @@ module mod_moloch
                      zpbw(j,i)*zrfmw - zpbw(j+1,i)*zrfme + zdv
               end do
             end do
-            !do i = ici1 , ici2
-            !  do j = jci1 , jci2
-            !    zrfme = mu(j+1,i) * zdtrdx
-            !    zrfmw = mu(j,i) * zdtrdx
-            !    zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
-            !    pp(j,i,k) = p0(j,i,k) + zpbw(j,i) - zpbw(j+1,i) + zdv
-            !  end do
-            !end do
+#endif
           end do
 !$acc end parallel
 
