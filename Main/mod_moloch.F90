@@ -952,7 +952,11 @@ module mod_moloch
 !$acc parallel present(u, hx, v, hy, s, gzitak) private(zuh, zvh)
 !$acc loop collapse(3)
 !!$acc loop  tile(4,8,8)
-          do k = 2, kz
+#ifdef OPENACC
+          do k = 2 , kz
+#else
+          do k = kz , 2 , -1
+#endif
             do i = ici1 , ici2
               do j = jci1 , jci2
                 zuh = (u(j,i,k)   + u(j,i,k-1))   * hx(j,i) + &
