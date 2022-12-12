@@ -1656,7 +1656,7 @@ module mod_moloch
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu*b - is*b
 #ifdef OPENACC
-                zpbws = d_half * u(j,i,k) * mu(j,i) * &
+                zpbws = d_half * u(j,i,k) * &
                 ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
 
                 zamu = u(j+1,i,k) * rmu(j+1,i) * zdtrdx
@@ -1671,7 +1671,7 @@ module mod_moloch
                 r = rdeno(p0(jh,i,k), p0(jhm1,i,k), p0(j+1,i,k), p0(j,i,k))
                 b = max(wlow, min(whigh, max(r, min(d_two*r,d_one))))
                 zphi = is + zamu*b - is*b
-                zpbwsp1 = d_half * u(j+1,i,k) * rmu(j+1,i) * &
+                zpbwsp1 = d_half * u(j+1,i,k) * &
                     ((d_one+zphi)*p0(j,i,k) + (d_one-zphi)*p0(j+1,i,k))
                 zcostx = zdtrdx * mu(j,i)
                 zrfme = zcostx * d_two * fmz(j,i,k)/(fmz(j,i,k)+fmz(j+1,i,k))
@@ -1679,7 +1679,7 @@ module mod_moloch
                 zdv = (u(j+1,i,k) * zrfme - u(j,i,k) * zrfmw) * pp(j,i,k)
                 pp(j,i,k) = p0(j,i,k) + zpbws*zrfmw - zpbwsp1*zrfme + zdv
 #else
-                zpbw(j,i) = d_half * u(j,i,k) * rmu(j,i) * &
+                zpbw(j,i) = d_half * u(j,i,k) * &
                     ((d_one+zphi)*p0(j-1,i,k) + (d_one-zphi)*p0(j,i,k))
 #endif
               end do
